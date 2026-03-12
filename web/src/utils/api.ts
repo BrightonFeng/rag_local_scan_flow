@@ -113,6 +113,8 @@ export default {
   get_document_file_download: (docId: string) =>
     `${api_host}/document/download/${docId}`,
   document_upload: `${api_host}/document/upload`,
+  scan_path: `${api_host}/document/scan_path`,
+  scannedDirectories: `${api_host}/document/scanned_directories`,
   web_crawl: `${api_host}/document/web_crawl`,
   document_infos: `${api_host}/document/infos`,
   upload_and_parse: `${api_host}/document/upload_info`,

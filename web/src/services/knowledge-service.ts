@@ -7,7 +7,7 @@ import {
 import { ProcessingType } from '@/pages/dataset/dataset-overview/dataset-common';
 import api from '@/utils/api';
 import registerServer from '@/utils/register-server';
-import request, { post } from '@/utils/request';
+import request, { get, post } from '@/utils/request';
 
 const {
   create_kb,
@@ -49,6 +49,7 @@ const {
   check_embedding,
   kbUpdateMetaData,
   documentUpdateMetaData,
+  scan_path,
 } = api;
 
 const methods = {
@@ -299,5 +300,28 @@ export function deletePipelineTask({
 }) {
   return request.delete(api.unbindPipelineTask({ kb_id, type }));
 }
+
+export const scanPath = (kbId: string, path: string, scanInterval?: number) => {
+  return post(scan_path, { kb_id: kbId, path, scan_interval: scanInterval });
+};
+
+export const getScannedDirectories = (kbId: string) => {
+  return get(`${api.scannedDirectories}?kb_id=${kbId}`);
+};
+
+export const deleteScannedDirectory = (directoryId: string) => {
+  return request.delete(`${api.scannedDirectories}/${directoryId}`);
+};
+
+export const updateScannedDirectory = (
+  directoryId: string,
+  scanInterval: number,
+) => {
+  return request.put(`${api.scannedDirectories}/${directoryId}`, {
+    data: {
+      scan_interval: scanInterval,
+    },
+  });
+};
 
 export default kbService;

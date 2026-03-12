@@ -75,6 +75,7 @@ async def upload():
         return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
 
     file_objs = files.getlist("file")
+
     def _close_file_objs(objs):
         for obj in objs:
             try:
@@ -84,6 +85,7 @@ async def upload():
                     obj.stream.close()
                 except Exception:
                     pass
+
     for file_obj in file_objs:
         if file_obj.filename == "":
             _close_file_objs(file_objs)
@@ -239,7 +241,7 @@ async def list_docs():
     kb_id = request.args.get("kb_id")
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
-        
+
     tenants = UserTenantService.query(user_id=current_user.id)
     for tenant in tenants:
         if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
@@ -608,6 +610,7 @@ async def run():
     req = await get_request_json()
     uid = current_user.id
     try:
+
         def _run_sync():
             for doc_id in req["doc_ids"]:
                 if not DocumentService.accessible(doc_id, uid):
@@ -670,6 +673,7 @@ async def rename():
     req = await get_request_json()
     uid = current_user.id
     try:
+
         def _rename_sync():
             if not DocumentService.accessible(req["doc_id"], uid):
                 return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
@@ -760,7 +764,6 @@ async def download_attachment(attachment_id):
 @login_required
 @validate_request("doc_id")
 async def change_parser():
-
     req = await get_request_json()
     if not DocumentService.accessible(req["doc_id"], current_user.id):
         return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
@@ -942,8 +945,221 @@ async def set_meta():
 @manager.route("/upload_info", methods=["POST"])  # noqa: F821
 async def upload_info():
     files = await request.files
-    file = files['file'] if files and files.get("file") else None
+    file = files["file"] if files and files.get("file") else None
     try:
         return get_json_result(data=FileService.upload_info(current_user.id, file, request.args.get("url")))
     except Exception as e:
-        return  server_error_response(e)
+        return server_error_response(e)
+
+
+@manager.route("/scan_path", methods=["POST"])
+@login_required
+@validate_request("kb_id", "path")
+async def scan_path():
+    """
+    Scan a local path and import all supported files to the knowledge base.
+    Only stores file path + index vector, not the original file itself.
+    """
+    req = await get_request_json()
+    kb_id = req.get("kb_id")
+    path = req.get("path")
+    scan_interval = req.get("scan_interval", 60)
+
+    if not kb_id:
+        return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
+    if not path:
+        return get_json_result(data=False, message='Lack of "path"', code=RetCode.ARGUMENT_ERROR)
+
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        return get_json_result(data=False, message=f"Path does not exist: {path}", code=RetCode.ARGUMENT_ERROR)
+    if not os.path.isdir(path):
+        return get_json_result(data=False, message=f"Path is not a directory: {path}", code=RetCode.ARGUMENT_ERROR)
+
+    e, kb = KnowledgebaseService.get_by_id(kb_id)
+    if not e:
+        raise LookupError("Can't find this knowledgebase!")
+    if not check_kb_team_permission(kb, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+    from api.db.services.scanned_directory_service import ScannedDirectoryService
+
+    existing_dirs = ScannedDirectoryService.get_by_kb_id(kb_id)
+    for existing_dir in existing_dirs:
+        if existing_dir.directory_path == path:
+            ScannedDirectoryService.update_last_scan_time(existing_dir.id)
+            scan_dir_id = existing_dir.id
+            break
+    else:
+        scan_dir_id = ScannedDirectoryService.add(kb_id, path, scan_interval, current_user.id)
+
+    supported_extensions = (
+        r".*\.pdf$|"
+        r".*\.(msg|eml|doc|docx|ppt|pptx|yml|xml|htm|json|jsonl|ldjson|csv|txt|ini|xls|xlsx|wps|rtf|hlp|pages|numbers|key|md|py|js|java|c|cpp|h|php|go|ts|sh|cs|kt|html|sql)$|"
+        r".*\.(wav|flac|ape|alac|wv|mp3|aac|ogg|vorbis|opus)$|"
+        r".*\.(jpg|jpeg|png|tif|gif|pcx|tga|exif|fpx|svg|psd|cdr|pcd|dxf|ufo|eps|ai|raw|webp|avif|apng|icon|ico|mpg|mpeg|avi|rm|rmvb|mov|wmv|asf|dat|asx|wvx|mpe|mpa|mp4|avi|mkv)$"
+    )
+
+    files_to_import = []
+    imported_docs = []
+    errors = []
+
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if re.match(supported_extensions, file, re.IGNORECASE):
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, path)
+                files_to_import.append((file_path, rel_path))
+
+    if not files_to_import:
+        return get_json_result(data={"imported": [], "errors": [], "scan_dir_id": scan_dir_id}, message="No supported files found in the specified path.")
+
+    from api.db.services.document_service import DocumentService
+
+    imported_docs = []
+    errors = []
+
+    import logging
+
+    logging.info(f"Scan path: kb.id={kb.id}, kb_id={kb_id}, user={current_user.id}")
+
+    for file_path, rel_path in files_to_import:
+        try:
+            filename = os.path.basename(file_path)
+            from uuid import uuid4
+
+            doc_id = uuid4().hex
+
+            doc = {
+                "id": doc_id,
+                "kb_id": kb.id,
+                "parser_id": kb.parser_id,
+                "pipeline_id": kb.pipeline_id,
+                "parser_config": kb.parser_config,
+                "created_by": current_user.id,
+                "type": filename.split(".")[-1] if "." in filename else "",
+                "name": filename,
+                "source_type": "local_path",
+                "suffix": filename.split(".")[-1] if "." in filename else "",
+                "location": file_path,
+                "size": os.path.getsize(file_path),
+                "thumbnail": "",
+                "content_hash": "",
+                "run": "0",
+                "status": "1",
+                "progress": 0,
+            }
+            logging.info(f"Inserting doc: {doc}")
+            try:
+                DocumentService.insert(doc)
+
+                from api.db.services.file_service import FileService
+                from api.db.db_models import File, File2Document
+
+                kb_folder = FileService.get_kb_folder(current_user.id)
+                parent_id = kb_folder.get("id")
+
+                file_rec = {
+                    "id": doc_id,
+                    "parent_id": parent_id,
+                    "tenant_id": kb.tenant_id,
+                    "created_by": current_user.id,
+                    "name": filename,
+                    "location": file_path,
+                    "size": os.path.getsize(file_path),
+                    "type": filename.split(".")[-1] if "." in filename else "",
+                    "source_type": "local_path",
+                }
+                File.insert(**file_rec).execute()
+
+                File2Document.insert(document_id=doc_id, file_id=doc_id).execute()
+
+                logging.info(f"Inserted document: {doc_id}, kb_id={kb.id}")
+                imported_docs.append(doc_id)
+            except Exception as insert_err:
+                logging.error(f"Failed to insert: {str(insert_err)}")
+                errors.append(f"{rel_path}: {str(insert_err)}")
+        except Exception as e:
+            logging.error(f"Failed to insert document: {str(e)}")
+            errors.append(f"{rel_path}: {str(e)}")
+
+    return get_json_result(data={"imported": imported_docs, "errors": errors, "scan_dir_id": scan_dir_id})
+
+
+@manager.route("/scanned_directories", methods=["GET"])
+@login_required
+async def get_scanned_directories():
+    """Get all scanned directories for a knowledge base."""
+    kb_id = request.args.get("kb_id")
+
+    if not kb_id:
+        return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
+
+    e, kb = KnowledgebaseService.get_by_id(kb_id)
+    if not e:
+        raise LookupError("Can't find this knowledgebase!")
+    if not check_kb_team_permission(kb, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+    from api.db.services.scanned_directory_service import ScannedDirectoryService
+
+    directories = ScannedDirectoryService.get_by_kb_id(kb_id)
+    result = []
+    for d in directories:
+        result.append(
+            {
+                "id": d.id,
+                "kb_id": d.kb_id,
+                "directory_path": d.directory_path,
+                "scan_interval_minutes": d.scan_interval_minutes,
+                "last_scan_time": d.last_scan_time.isoformat() if d.last_scan_time else None,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+        )
+
+    return get_json_result(data=result)
+
+
+@manager.route("/scanned_directories/<directory_id>", methods=["DELETE"])
+@login_required
+async def delete_scanned_directory(directory_id):
+    """Delete a scanned directory from the scan list (does not delete actual files)."""
+    from api.db.services.scanned_directory_service import ScannedDirectoryService
+
+    success, directory = ScannedDirectoryService.get_by_id(directory_id)
+    if not success or not directory:
+        return get_json_result(data=False, message="Directory not found", code=RetCode.NOTFOUND)
+
+    e, kb = KnowledgebaseService.get_by_id(directory.kb_id)
+    if not e:
+        raise LookupError("Can't find this knowledgebase!")
+    if not check_kb_team_permission(kb, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+    ScannedDirectoryService.delete_by_id(directory_id)
+
+    return get_json_result(data={"deleted": True})
+
+
+@manager.route("/scanned_directories/<directory_id>", methods=["PUT"])
+@login_required
+async def update_scanned_directory(directory_id):
+    """Update scan interval for a scanned directory."""
+    req = await get_request_json()
+    scan_interval = req.get("scan_interval", 60)
+
+    from api.db.services.scanned_directory_service import ScannedDirectoryService
+
+    success, directory = ScannedDirectoryService.get_by_id(directory_id)
+    if not success or not directory:
+        return get_json_result(data=False, message="Directory not found", code=RetCode.NOTFOUND)
+
+    e, kb = KnowledgebaseService.get_by_id(directory.kb_id)
+    if not e:
+        raise LookupError("Can't find this knowledgebase!")
+    if not check_kb_team_permission(kb, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+    ScannedDirectoryService.update_scan_interval(directory_id, scan_interval)
+
+    return get_json_result(data={"scan_interval_minutes": scan_interval})

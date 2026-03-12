@@ -16,8 +16,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRowSelection } from '@/hooks/logic-hooks/use-row-selection';
 import { useFetchDocumentList } from '@/hooks/use-document-request';
-import { useFetchKnowledgeBaseConfiguration } from '@/hooks/use-knowledge-request';
-import { LucidePlus } from 'lucide-react';
+import {
+  useFetchKnowledgeBaseConfiguration,
+  useKnowledgeBaseId,
+} from '@/hooks/use-knowledge-request';
+import { LucidePlus, Upload } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MetadataType } from '../components/metedata/constant';
@@ -27,8 +30,10 @@ import { useKnowledgeBaseContext } from '../contexts/knowledge-base-context';
 import { DatasetTable } from './dataset-table';
 import Generate from './generate-button/generate';
 import { ReparseDialog } from './reparse-dialog';
+import ScanPathModal from './scan-path-modal';
 import { useBulkOperateDataset } from './use-bulk-operate-dataset';
 import { useCreateEmptyDocument } from './use-create-empty-document';
+import { useScanPath } from './use-scan-path';
 import { useSelectDatasetFilters } from './use-select-filters';
 import { useHandleUploadDocument } from './use-upload-document';
 
@@ -42,6 +47,17 @@ export default function Dataset() {
     documentUploadLoading,
   } = useHandleUploadDocument();
   const { knowledgeBase } = useKnowledgeBaseContext();
+  const kbId = useKnowledgeBaseId();
+  const {
+    scanPathVisible,
+    hideScanPathModal,
+    showScanPathModal,
+    onScanPathOk,
+    scanPathLoading,
+    directories,
+    onDelete,
+    onUpdateInterval,
+  } = useScanPath(kbId);
   const {
     searchString,
     documents,
@@ -211,6 +227,10 @@ export default function Dataset() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button size="default" onClick={() => showScanPathModal()}>
+            <Upload />
+            Scan Local Directory
+          </Button>
         </ListFilterBar>
 
         {rowSelectionIsEmpty || (
@@ -293,6 +313,17 @@ export default function Dataset() {
             visible={reparseDialogVisible}
             hideModal={hideReparseDialogModal}
           ></ReparseDialog>
+        )}
+        {scanPathVisible && (
+          <ScanPathModal
+            visible={scanPathVisible}
+            hideModal={hideScanPathModal}
+            onOk={onScanPathOk}
+            loading={scanPathLoading}
+            directories={directories}
+            onDelete={onDelete}
+            onUpdateInterval={onUpdateInterval}
+          ></ScanPathModal>
         )}
       </CardContent>
     </Card>
