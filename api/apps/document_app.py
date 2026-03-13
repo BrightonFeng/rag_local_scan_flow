@@ -1068,19 +1068,23 @@ async def scan_path():
                     "location": file_path,
                     "size": os.path.getsize(file_path),
                     "type": filename.split(".")[-1] if "." in filename else "",
-                    "source_type": "local_path",
+                    "source_type": "local",
                 }
                 File.insert(**file_rec).execute()
 
                 File2Document.insert(document_id=doc_id, file_id=doc_id).execute()
 
-                logging.info(f"Inserted document: {doc_id}, kb_id={kb.id}")
+                doc["run"] = "1"
+                doc["tenant_id"] = kb.tenant_id
+                DocumentService.run(kb.tenant_id, doc, {})
+
+                logging.info(f"Inserted and started parsing document: {doc_id}, kb_id={kb.id}")
                 imported_docs.append(doc_id)
             except Exception as insert_err:
                 logging.error(f"Failed to insert: {str(insert_err)}")
                 errors.append(f"{rel_path}: {str(insert_err)}")
         except Exception as e:
-            logging.error(f"Failed to insert document: {str(e)}")
+            logging.error(f"Failed to process file: {str(e)}")
             errors.append(f"{rel_path}: {str(e)}")
 
     return get_json_result(data={"imported": imported_docs, "errors": errors, "scan_dir_id": scan_dir_id})

@@ -18,12 +18,20 @@ const useFetchOverviewTital = () => {
   const { id } = useParams();
   const knowledgeBaseId = searchParams.get('id') || id;
   const { data } = useQuery<IOverviewTotal>({
-    queryKey: ['overviewTotal'],
+    queryKey: ['overviewTotal', knowledgeBaseId],
     queryFn: async () => {
       const { data: res = {} } = await kbService.getKnowledgeBasicInfo({
         kb_id: knowledgeBaseId,
       });
-      return res.data || [];
+      return (
+        res.data || {
+          cancelled: 0,
+          downloaded: 0,
+          failed: 0,
+          finished: 0,
+          processing: 0,
+        }
+      );
     },
   });
   return { data };
@@ -71,7 +79,7 @@ const useFetchFileLogList = () => {
         },
         { ...filterValue },
       );
-      return res.data || [];
+      return res.data || { logs: [], total: 0 };
     },
   });
   const onInputChange: React.ChangeEventHandler<HTMLInputElement> = useCallback(

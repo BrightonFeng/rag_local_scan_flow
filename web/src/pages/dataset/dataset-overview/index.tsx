@@ -140,32 +140,40 @@ const FileLogsPage: FC = () => {
   } = useFetchDocumentList();
 
   useEffect(() => {
-    setTopAllData((prev) => {
-      return {
-        ...prev,
-        downloads: {
-          ...prev.downloads,
-          success: topData?.downloaded || 0,
-        },
-        processing: {
-          value: topData?.processing || 0,
-          success: topData?.finished || 0,
-          failed: topData?.failed || 0,
-        },
-      };
-    });
+    try {
+      setTopAllData((prev) => {
+        return {
+          ...prev,
+          downloads: {
+            ...prev.downloads,
+            success: topData?.downloaded || 0,
+          },
+          processing: {
+            value: topData?.processing || 0,
+            success: topData?.finished || 0,
+            failed: topData?.failed || 0,
+          },
+        };
+      });
+    } catch (e) {
+      console.error('Error updating topAllData:', e);
+    }
   }, [topData]);
 
   useEffect(() => {
-    setTopAllData((prev) => {
-      return {
-        ...prev,
-        totalFiles: {
-          value: fileTotal || 0,
-          precent: 0,
-        },
-      };
-    });
+    try {
+      setTopAllData((prev) => {
+        return {
+          ...prev,
+          totalFiles: {
+            value: fileTotal || 0,
+            precent: 0,
+          },
+        };
+      });
+    } catch (e) {
+      console.error('Error updating totalFiles:', e);
+    }
   }, [fileTotal]);
 
   const {
@@ -227,17 +235,23 @@ const FileLogsPage: FC = () => {
   }, [active, t]);
 
   const tableList = useMemo(() => {
-    console.log('tableList', tableOriginData);
-    if (tableOriginData && tableOriginData.logs?.length) {
-      return tableOriginData.logs.map((item) => {
-        return {
-          ...item,
-          status: item.operation_status as RunningStatus,
-          statusName: RunningStatusMap[item.operation_status as RunningStatus],
-        } as unknown as IFileLogItem & DocumentLog;
-      });
+    try {
+      console.log('tableList', tableOriginData);
+      if (tableOriginData && tableOriginData.logs?.length) {
+        return tableOriginData.logs.map((item) => {
+          return {
+            ...item,
+            status: item.operation_status as RunningStatus,
+            statusName:
+              RunningStatusMap[item.operation_status as RunningStatus],
+          } as unknown as IFileLogItem & DocumentLog;
+        });
+      }
+      return [];
+    } catch (e) {
+      console.error('Error in tableList:', e);
+      return [];
     }
-    return [];
   }, [tableOriginData]);
 
   const changeActiveLogs = (active: (typeof LogTabs)[keyof typeof LogTabs]) => {

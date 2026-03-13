@@ -109,24 +109,26 @@ export const getFileLogsTableColumns = (
       accessorKey: 'source_from',
       header: t('source'),
       meta: { cellClassName: 'max-w-[10vw]' },
-      cell: ({ row }) => (
-        <div className="text-text-primary">
-          {row.original.source_from === 'local' ||
-          row.original.source_from === '' ? (
-            <div className="bg-accent-primary-5 w-6 h-6 rounded-full flex items-center justify-center">
-              <MonitorUp className="text-accent-primary" size={16} />
-            </div>
-          ) : (
-            <div className="w-6 h-6 flex items-center justify-center">
-              {
-                dataSourceInfo[
-                  row.original.source_from as keyof typeof dataSourceInfo
-                ].icon
-              }
-            </div>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const sourceInfo =
+          dataSourceInfo?.[
+            row.original.source_from as keyof typeof dataSourceInfo
+          ];
+        return (
+          <div className="text-text-primary">
+            {row.original.source_from === 'local' ||
+            row.original.source_from === '' ? (
+              <div className="bg-accent-primary-5 w-6 h-6 rounded-full flex items-center justify-center">
+                <MonitorUp className="text-accent-primary" size={16} />
+              </div>
+            ) : sourceInfo?.icon ? (
+              <div className="w-6 h-6 flex items-center justify-center">
+                {sourceInfo.icon}
+              </div>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'pipeline_title',
@@ -366,22 +368,19 @@ const FileLogsTable: FC<FileLogsTableProps> = ({
       ),
       details: row.original.progress_msg,
     } as unknown as IFileLogItem;
-    console.log('logDetail', logDetail);
     setLogInfo(logDetail);
     setIsModalVisible(true);
   };
   const { dataSourceInfo } = useDataSourceInfo();
   const columns = useMemo(() => {
-    return active === LogTabs.FILE_LOGS
-      ? getFileLogsTableColumns(
-          t,
-          showLog,
-          kowledgeId || '',
-          navigateToDataflowResult,
-          dataSourceInfo,
-        )
-      : getDatasetLogsTableColumns(t, showLog);
-  }, [active, t]);
+    return getFileLogsTableColumns(
+      t,
+      showLog,
+      kowledgeId || '',
+      () => {},
+      dataSourceInfo || {},
+    );
+  }, [t, kowledgeId, dataSourceInfo]);
 
   const currentPagination = useMemo(
     () => ({
