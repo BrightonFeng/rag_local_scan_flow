@@ -109,7 +109,8 @@ class ParserType(StrEnum):
 
 
 class FileSource(StrEnum):
-    LOCAL = ""
+    UPLOADED = "uploaded"
+    LOCAL_SCAN = "local_scan"
     KNOWLEDGEBASE = "knowledgebase"
     S3 = "s3"
     NOTION = "notion"

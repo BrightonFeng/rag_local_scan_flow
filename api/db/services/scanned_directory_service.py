@@ -3,6 +3,7 @@ from datetime import datetime
 from api.db.db_models import DB, logging
 from api.db.db_models import ScannedDirectory
 from api.db.services.common_service import CommonService
+from common.constants import FileSource
 
 
 class ScannedDirectoryService(CommonService):
@@ -58,7 +59,7 @@ class ScannedDirectoryService(CommonService):
         from api.db.db_models import Document
         from api.db.db_models import File2Document
 
-        doc_ids = list(Document.select(Document.id).where(Document.source_type == "local_path", Document.location.startswith(directory_path), Document.kb_id == kb_id))
+        doc_ids = list(Document.select(Document.id).where(Document.source_type == FileSource.LOCAL_SCAN.value, Document.location.startswith(directory_path), Document.kb_id == kb_id))
 
         file_ids = list(File2Document.select(File2Document.file_id).where(File2Document.document_id.in_([d.id for d in doc_ids])))
 

@@ -9,6 +9,7 @@ import os
 import re
 from datetime import datetime
 from uuid import uuid4
+from common.constants import FileSource
 
 
 def start_scan_scheduler():
@@ -141,7 +142,7 @@ def do_scan(kb_id, path, scan_interval=60):
                 "created_by": kb.tenant_id,
                 "type": filename.split(".")[-1] if "." in filename else "",
                 "name": filename,
-                "source_type": "local_path",
+                "source_type": FileSource.LOCAL_SCAN.value,
                 "suffix": filename.split(".")[-1] if "." in filename else "",
                 "location": file_path,
                 "size": os.path.getsize(file_path),

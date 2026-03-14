@@ -331,15 +331,27 @@ async def get(file_id):
             return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
         blob = None
-        if file.source_type == "local_path":
+        if file.source_type == FileSource.LOCAL_SCAN.value:
             local_path = file.location
             if os.path.exists(local_path):
+                ext = re.search(r"\.([^.]+)$", file.name.lower())
+                ext_value = ext.group(1) if ext else None
 
-                def read_local_file():
+                def read_local_file(ext_val):
                     with open(local_path, "rb") as f:
-                        return f.read()
+                        content = f.read()
+                        if ext_val in ["txt", "md", "markdown", "csv", "json", "xml", "html", "htm"]:
+                            try:
+                                content = content.decode("utf-8")
+                            except UnicodeDecodeError:
+                                try:
+                                    content = content.decode("gbk")
+                                except UnicodeDecodeError:
+                                    content = content.decode("latin1")
+                                content = content.encode("utf-8")
+                        return content
 
-                blob = await thread_pool_exec(read_local_file)
+                blob = await thread_pool_exec(read_local_file, ext_value)
             else:
                 return get_data_error_result(message="Local file not found!")
         else:
@@ -355,7 +367,11 @@ async def get(file_id):
         if ext:
             fallback_prefix = "image" if file.type == FileType.VISUAL.value else "application"
             content_type = CONTENT_TYPE_MAP.get(ext, f"{fallback_prefix}/{ext}")
-        apply_safe_file_response_headers(response, content_type, ext)
+            if content_type and content_type.startswith("text/"):
+                content_type = f"{content_type}; charset=utf-8"
+        if not content_type:
+            content_type = "application/octet-stream"
+        response.headers["Content-Type"] = content_type
         return response
     except Exception as e:
         return server_error_response(e)

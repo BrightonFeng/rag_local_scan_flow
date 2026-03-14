@@ -44,7 +44,7 @@ from api.utils.api_utils import (
 )
 from api.utils.file_utils import filename_type, thumbnail
 from common.file_utils import get_project_base_directory
-from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus
+from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus, FileSource
 from api.utils.web_utils import CONTENT_TYPE_MAP, apply_safe_file_response_headers, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
@@ -734,15 +734,27 @@ async def get(doc_id):
 
         data = None
         logging.info(f"Document get: doc_id={doc_id}, source_type={doc.source_type}, location={doc.location}")
-        if doc.source_type == "local_path":
+        if doc.source_type == FileSource.LOCAL_SCAN.value:
             local_path = doc.location
             if os.path.exists(local_path):
+                ext = re.search(r"\.([^.]+)$", doc.name.lower())
+                ext_value = ext.group(1) if ext else None
 
-                def read_local_file():
+                def read_local_file(ext_val):
                     with open(local_path, "rb") as f:
-                        return f.read()
+                        content = f.read()
+                        if ext_val in ["txt", "md", "markdown", "csv", "json", "xml", "html", "htm"]:
+                            try:
+                                content = content.decode("utf-8")
+                            except UnicodeDecodeError:
+                                try:
+                                    content = content.decode("gbk")
+                                except UnicodeDecodeError:
+                                    content = content.decode("latin1")
+                                content = content.encode("utf-8")
+                        return content
 
-                data = await thread_pool_exec(read_local_file)
+                data = await thread_pool_exec(read_local_file, ext_value)
             else:
                 logging.error(f"Local file not found: path={local_path}")
                 return get_data_error_result(message="Local file not found!")
@@ -757,7 +769,11 @@ async def get(doc_id):
         if ext:
             fallback_prefix = "image" if doc.type == FileType.VISUAL.value else "application"
             content_type = CONTENT_TYPE_MAP.get(ext, f"{fallback_prefix}/{ext}")
-        apply_safe_file_response_headers(response, content_type, ext)
+            if content_type and content_type.startswith("text/"):
+                content_type = f"{content_type}; charset=utf-8"
+        if not content_type:
+            content_type = "application/octet-stream"
+        response.headers["Content-Type"] = content_type
         return response
     except Exception as e:
         return server_error_response(e)
@@ -1086,7 +1102,7 @@ def do_scan_path(kb_id, path, scan_interval=60):
                 "created_by": kb.tenant_id,
                 "type": filename.split(".")[-1] if "." in filename else "",
                 "name": filename,
-                "source_type": "local_path",
+                "source_type": FileSource.LOCAL_SCAN.value,
                 "suffix": filename.split(".")[-1] if "." in filename else "",
                 "location": file_path,
                 "size": os.path.getsize(file_path),
@@ -1261,7 +1277,7 @@ async def scan_path():
                 "created_by": current_user.id,
                 "type": filename.split(".")[-1] if "." in filename else "",
                 "name": filename,
-                "source_type": "local_path",
+                "source_type": FileSource.LOCAL_SCAN.value,
                 "suffix": filename.split(".")[-1] if "." in filename else "",
                 "location": file_path,
                 "size": os.path.getsize(file_path),
