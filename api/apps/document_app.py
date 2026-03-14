@@ -14,6 +14,7 @@
 #  limitations under the License
 #
 import json
+import logging
 import os.path
 import pathlib
 import re
@@ -150,12 +151,8 @@ async def web_crawl():
         while settings.STORAGE_IMPL.obj_exist(kb_id, location):
             location += "_"
         settings.STORAGE_IMPL.put(kb_id, location, blob)
+
         doc = {
-            "id": get_uuid(),
-            "kb_id": kb.id,
-            "parser_id": kb.parser_id,
-            "parser_config": kb.parser_config,
-            "created_by": current_user.id,
             "type": filetype,
             "name": filename,
             "location": location,
@@ -732,10 +729,26 @@ async def get(doc_id):
     try:
         e, doc = DocumentService.get_by_id(doc_id)
         if not e:
+            logging.error(f"Document not found: doc_id={doc_id}")
             return get_data_error_result(message="Document not found!")
 
-        b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
-        data = await thread_pool_exec(settings.STORAGE_IMPL.get, b, n)
+        data = None
+        logging.info(f"Document get: doc_id={doc_id}, source_type={doc.source_type}, location={doc.location}")
+        if doc.source_type == "local_path":
+            local_path = doc.location
+            if os.path.exists(local_path):
+
+                def read_local_file():
+                    with open(local_path, "rb") as f:
+                        return f.read()
+
+                data = await thread_pool_exec(read_local_file)
+            else:
+                logging.error(f"Local file not found: path={local_path}")
+                return get_data_error_result(message="Local file not found!")
+        else:
+            b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
+            data = await thread_pool_exec(settings.STORAGE_IMPL.get, b, n)
         response = await make_response(data)
 
         ext = re.search(r"\.([^.]+)$", doc.name.lower())
@@ -1047,10 +1060,27 @@ def do_scan_path(kb_id, path, scan_interval=60):
             filename = os.path.basename(file_path)
             doc_id = uuid4().hex
 
+            from api.utils.file_utils import filename_type
+            from api.db import FileType
+            from common.constants import ParserType
+
+            filetype = filename_type(filename)
+            file_parser = kb.parser_id
+            import logging
+
+            logging.info(f"SCAN_PATH: filename={filename} filetype={filetype} kb.parser_id={kb.parser_id} VISUAL.value={FileType.VISUAL.value}")
+            if filetype == FileType.VISUAL.value:
+                file_parser = ParserType.PICTURE.value
+                logging.info(f"SCAN_PATH: Set PICTURE for {filename}")
+            elif filetype == FileType.AURAL.value:
+                file_parser = ParserType.AUDIO.value
+                logging.info(f"SCAN_PATH: Set AUDIO for {filename}")
+            logging.info(f"SCAN_PATH: Final parser_id for {filename} = {file_parser}")
+
             doc = {
                 "id": doc_id,
                 "kb_id": kb.id,
-                "parser_id": kb.parser_id,
+                "parser_id": file_parser,
                 "pipeline_id": kb.pipeline_id,
                 "parser_config": kb.parser_config,
                 "created_by": kb.tenant_id,
@@ -1211,10 +1241,21 @@ async def scan_path():
 
             doc_id = uuid4().hex
 
+            from api.utils.file_utils import filename_type
+            from api.db import FileType
+            from common.constants import ParserType
+
+            filetype = filename_type(filename)
+            file_parser = kb.parser_id
+            if filetype == FileType.VISUAL.value:
+                file_parser = ParserType.PICTURE.value
+            elif filetype == FileType.AURAL.value:
+                file_parser = ParserType.AUDIO.value
+
             doc = {
                 "id": doc_id,
                 "kb_id": kb.id,
-                "parser_id": kb.parser_id,
+                "parser_id": file_parser,
                 "pipeline_id": kb.pipeline_id,
                 "parser_config": kb.parser_config,
                 "created_by": current_user.id,

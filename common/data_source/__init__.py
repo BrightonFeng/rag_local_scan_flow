@@ -1,4 +1,3 @@
-
 """
 Thanks to https://github.com/onyx-dot-app/onyx
 
@@ -36,7 +35,11 @@ from .sharepoint_connector import SharePointConnector
 from .teams_connector import TeamsConnector
 from .moodle_connector import MoodleConnector
 from .airtable_connector import AirtableConnector
-from .dingtalk_ai_table_connector import DingTalkAITableConnector
+
+try:
+    from .dingtalk_ai_table_connector import DingTalkAITableConnector
+except ImportError:
+    DingTalkAITableConnector = None
 from .asana_connector import AsanaConnector
 from .imap_connector import ImapConnector
 from .zendesk_connector import ZendeskConnector
@@ -45,13 +48,7 @@ from .rdbms_connector import RDBMSConnector
 from .webdav_connector import WebDAVConnector
 from .config import BlobType, DocumentSource
 from .models import Document, TextSection, ImageSection, BasicExpertInfo
-from .exceptions import (
-    ConnectorMissingCredentialError,
-    ConnectorValidationError,
-    CredentialExpiredError,
-    InsufficientPermissionsError,
-    UnexpectedValidationError
-)
+from .exceptions import ConnectorMissingCredentialError, ConnectorValidationError, CredentialExpiredError, InsufficientPermissionsError, UnexpectedValidationError
 
 __all__ = [
     "BlobStorageConnector",

@@ -34,7 +34,8 @@ from api.utils.file_utils import filename_type
 from api.utils.web_utils import CONTENT_TYPE_MAP, apply_safe_file_response_headers
 from common import settings
 
-@manager.route('/upload', methods=['POST'])  # noqa: F821
+
+@manager.route("/upload", methods=["POST"])  # noqa: F821
 @login_required
 # @validate_request("parent_id")
 async def upload():
@@ -46,32 +47,30 @@ async def upload():
         pf_id = root_folder["id"]
 
     files = await request.files
-    if 'file' not in files:
-        return get_json_result(
-            data=False, message='No file part!', code=RetCode.ARGUMENT_ERROR)
-    file_objs = files.getlist('file')
+    if "file" not in files:
+        return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
+    file_objs = files.getlist("file")
 
     for file_obj in file_objs:
-        if file_obj.filename == '':
-            return get_json_result(
-                data=False, message='No file selected!', code=RetCode.ARGUMENT_ERROR)
+        if file_obj.filename == "":
+            return get_json_result(data=False, message="No file selected!", code=RetCode.ARGUMENT_ERROR)
     file_res = []
     try:
         e, pf_folder = FileService.get_by_id(pf_id)
         if not e:
-            return get_data_error_result( message="Can't find this folder!")
+            return get_data_error_result(message="Can't find this folder!")
 
         async def _handle_single_file(file_obj):
-            MAX_FILE_NUM_PER_USER: int = int(os.environ.get('MAX_FILE_NUM_PER_USER', 0))
+            MAX_FILE_NUM_PER_USER: int = int(os.environ.get("MAX_FILE_NUM_PER_USER", 0))
             if 0 < MAX_FILE_NUM_PER_USER <= await thread_pool_exec(DocumentService.get_doc_count, current_user.id):
-                return get_data_error_result( message="Exceed the maximum file number of a free user!")
+                return get_data_error_result(message="Exceed the maximum file number of a free user!")
 
             # split file name path
             if not file_obj.filename:
                 file_obj_names = [pf_folder.name, file_obj.filename]
             else:
-                full_path = '/' + file_obj.filename
-                file_obj_names = full_path.split('/')
+                full_path = "/" + file_obj.filename
+                file_obj_names = full_path.split("/")
             file_len = len(file_obj_names)
 
             # get folder
@@ -83,14 +82,12 @@ async def upload():
                 e, file = await thread_pool_exec(FileService.get_by_id, file_id_list[len_id_list - 1])
                 if not e:
                     return get_data_error_result(message="Folder not found!")
-                last_folder = await thread_pool_exec(FileService.create_folder, file, file_id_list[len_id_list - 1], file_obj_names,
-                                                        len_id_list)
+                last_folder = await thread_pool_exec(FileService.create_folder, file, file_id_list[len_id_list - 1], file_obj_names, len_id_list)
             else:
                 e, file = await thread_pool_exec(FileService.get_by_id, file_id_list[len_id_list - 2])
                 if not e:
                     return get_data_error_result(message="Folder not found!")
-                last_folder = await thread_pool_exec(FileService.create_folder, file, file_id_list[len_id_list - 2], file_obj_names,
-                                                        len_id_list)
+                last_folder = await thread_pool_exec(FileService.create_folder, file, file_id_list[len_id_list - 2], file_obj_names, len_id_list)
 
             # file type
             filetype = filename_type(file_obj_names[file_len - 1])
@@ -98,11 +95,7 @@ async def upload():
             while await thread_pool_exec(settings.STORAGE_IMPL.obj_exist, last_folder.id, location):
                 location += "_"
             blob = await thread_pool_exec(file_obj.read)
-            filename = await thread_pool_exec(
-                duplicate_name,
-                FileService.query,
-                name=file_obj_names[file_len - 1],
-                parent_id=last_folder.id)
+            filename = await thread_pool_exec(duplicate_name, FileService.query, name=file_obj_names[file_len - 1], parent_id=last_folder.id)
             await thread_pool_exec(settings.STORAGE_IMPL.put, last_folder.id, location, blob)
             file_data = {
                 "id": get_uuid(),
@@ -126,7 +119,7 @@ async def upload():
         return server_error_response(e)
 
 
-@manager.route('/create', methods=['POST'])  # noqa: F821
+@manager.route("/create", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("name")
 async def create():
@@ -139,34 +132,25 @@ async def create():
 
     try:
         if not FileService.is_parent_folder_exist(pf_id):
-            return get_json_result(
-                data=False, message="Parent Folder Doesn't Exist!", code=RetCode.OPERATING_ERROR)
+            return get_json_result(data=False, message="Parent Folder Doesn't Exist!", code=RetCode.OPERATING_ERROR)
         if FileService.query(name=req["name"], parent_id=pf_id):
-            return get_data_error_result(
-                message="Duplicated folder name in the same folder.")
+            return get_data_error_result(message="Duplicated folder name in the same folder.")
 
         if input_file_type == FileType.FOLDER.value:
             file_type = FileType.FOLDER.value
         else:
             file_type = FileType.VIRTUAL.value
 
-        file = FileService.insert({
-            "id": get_uuid(),
-            "parent_id": pf_id,
-            "tenant_id": current_user.id,
-            "created_by": current_user.id,
-            "name": req["name"],
-            "location": "",
-            "size": 0,
-            "type": file_type
-        })
+        file = FileService.insert(
+            {"id": get_uuid(), "parent_id": pf_id, "tenant_id": current_user.id, "created_by": current_user.id, "name": req["name"], "location": "", "size": 0, "type": file_type}
+        )
 
         return get_json_result(data=file.to_json())
     except Exception as e:
         return server_error_response(e)
 
 
-@manager.route('/list', methods=['GET'])  # noqa: F821
+@manager.route("/list", methods=["GET"])  # noqa: F821
 @login_required
 def list_files():
     pf_id = request.args.get("parent_id")
@@ -186,8 +170,7 @@ def list_files():
         if not e:
             return get_data_error_result(message="Folder not found!")
 
-        files, total = FileService.get_by_pf_id(
-            current_user.id, pf_id, page_number, items_per_page, orderby, desc, keywords)
+        files, total = FileService.get_by_pf_id(current_user.id, pf_id, page_number, items_per_page, orderby, desc, keywords)
 
         parent_folder = FileService.get_parent_folder(pf_id)
         if not parent_folder:
@@ -198,7 +181,7 @@ def list_files():
         return server_error_response(e)
 
 
-@manager.route('/root_folder', methods=['GET'])  # noqa: F821
+@manager.route("/root_folder", methods=["GET"])  # noqa: F821
 @login_required
 def get_root_folder():
     try:
@@ -208,7 +191,7 @@ def get_root_folder():
         return server_error_response(e)
 
 
-@manager.route('/parent_folder', methods=['GET'])  # noqa: F821
+@manager.route("/parent_folder", methods=["GET"])  # noqa: F821
 @login_required
 def get_parent_folder():
     file_id = request.args.get("file_id")
@@ -223,7 +206,7 @@ def get_parent_folder():
         return server_error_response(e)
 
 
-@manager.route('/all_parent_folder', methods=['GET'])  # noqa: F821
+@manager.route("/all_parent_folder", methods=["GET"])  # noqa: F821
 @login_required
 def get_all_parent_folders():
     file_id = request.args.get("file_id")
@@ -250,6 +233,7 @@ async def rm():
     uid = current_user.id
 
     try:
+
         def _delete_single_file(file):
             try:
                 if file.location:
@@ -306,7 +290,7 @@ async def rm():
         return server_error_response(e)
 
 
-@manager.route('/rename', methods=['POST'])  # noqa: F821
+@manager.route("/rename", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("file_id", "name")
 async def rename():
@@ -316,37 +300,27 @@ async def rename():
         if not e:
             return get_data_error_result(message="File not found!")
         if not check_file_team_permission(file, current_user.id):
-            return get_json_result(data=False, message='No authorization.', code=RetCode.AUTHENTICATION_ERROR)
-        if file.type != FileType.FOLDER.value \
-            and pathlib.Path(req["name"].lower()).suffix != pathlib.Path(
-                file.name.lower()).suffix:
-            return get_json_result(
-                data=False,
-                message="The extension of file can't be changed",
-                code=RetCode.ARGUMENT_ERROR)
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+        if file.type != FileType.FOLDER.value and pathlib.Path(req["name"].lower()).suffix != pathlib.Path(file.name.lower()).suffix:
+            return get_json_result(data=False, message="The extension of file can't be changed", code=RetCode.ARGUMENT_ERROR)
         for file in FileService.query(name=req["name"], pf_id=file.parent_id):
             if file.name == req["name"]:
-                return get_data_error_result(
-                    message="Duplicated file name in the same folder.")
+                return get_data_error_result(message="Duplicated file name in the same folder.")
 
-        if not FileService.update_by_id(
-                req["file_id"], {"name": req["name"]}):
-            return get_data_error_result(
-                message="Database error (File rename)!")
+        if not FileService.update_by_id(req["file_id"], {"name": req["name"]}):
+            return get_data_error_result(message="Database error (File rename)!")
 
         informs = File2DocumentService.get_by_file_id(req["file_id"])
         if informs:
-            if not DocumentService.update_by_id(
-                    informs[0].document_id, {"name": req["name"]}):
-                return get_data_error_result(
-                    message="Database error (Document rename)!")
+            if not DocumentService.update_by_id(informs[0].document_id, {"name": req["name"]}):
+                return get_data_error_result(message="Database error (Document rename)!")
 
         return get_json_result(data=True)
     except Exception as e:
         return server_error_response(e)
 
 
-@manager.route('/get/<file_id>', methods=['GET'])  # noqa: F821
+@manager.route("/get/<file_id>", methods=["GET"])  # noqa: F821
 @login_required
 async def get(file_id):
     try:
@@ -354,12 +328,25 @@ async def get(file_id):
         if not e:
             return get_data_error_result(message="Document not found!")
         if not check_file_team_permission(file, current_user.id):
-            return get_json_result(data=False, message='No authorization.', code=RetCode.AUTHENTICATION_ERROR)
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
-        blob = await thread_pool_exec(settings.STORAGE_IMPL.get, file.parent_id, file.location)
-        if not blob:
-            b, n = File2DocumentService.get_storage_address(file_id=file_id)
-            blob = await thread_pool_exec(settings.STORAGE_IMPL.get, b, n)
+        blob = None
+        if file.source_type == "local_path":
+            local_path = file.location
+            if os.path.exists(local_path):
+
+                def read_local_file():
+                    with open(local_path, "rb") as f:
+                        return f.read()
+
+                blob = await thread_pool_exec(read_local_file)
+            else:
+                return get_data_error_result(message="Local file not found!")
+        else:
+            blob = await thread_pool_exec(settings.STORAGE_IMPL.get, file.parent_id, file.location)
+            if not blob:
+                b, n = File2DocumentService.get_storage_address(file_id=file_id)
+                blob = await thread_pool_exec(settings.STORAGE_IMPL.get, b, n)
 
         response = await make_response(blob)
         ext = re.search(r"\.([^.]+)$", file.name.lower())

@@ -89,10 +89,12 @@ const ScanPathModal: React.FC<IProps> = ({
           style={{ width: 90 }}
           size="small"
           options={[
+            { label: '10m', value: 10 },
             { label: '30m', value: 30 },
             { label: '1h', value: 60 },
             { label: '3h', value: 180 },
             { label: '1d', value: 1440 },
+            { label: '1w', value: 10080 },
           ]}
         />
       ),
@@ -163,16 +165,18 @@ const ScanPathModal: React.FC<IProps> = ({
           <Form.Item
             label={t('scanDirectory.scanInterval')}
             name="scan_interval"
-            initialValue={60}
+            initialValue={10080}
           >
             <Select
               style={{ width: '100%' }}
               getPopupContainer={(trigger) => trigger.parentElement!}
               options={[
+                { label: t('scanDirectory.every10Minutes'), value: 10 },
                 { label: t('scanDirectory.every30Minutes'), value: 30 },
                 { label: t('scanDirectory.every1Hour'), value: 60 },
                 { label: t('scanDirectory.every3Hours'), value: 180 },
                 { label: t('scanDirectory.everyDay'), value: 1440 },
+                { label: t('scanDirectory.everyWeek'), value: 10080 },
               ]}
             />
           </Form.Item>

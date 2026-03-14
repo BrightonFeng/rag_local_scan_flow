@@ -38,6 +38,7 @@ from rag.nlp import search
 CANVAS_DEBUG_DOC_ID = "dataflow_x"
 GRAPH_RAPTOR_FAKE_DOC_ID = "graph_raptor_x"
 
+
 def trim_header_by_lines(text: str, max_length) -> str:
     # Trim header text to maximum length while preserving line breaks
     # Args:
@@ -49,8 +50,8 @@ def trim_header_by_lines(text: str, max_length) -> str:
     if len_text <= max_length:
         return text
     for i in range(len_text):
-        if text[i] == '\n' and len_text - i <= max_length:
-            return text[i + 1:]
+        if text[i] == "\n" and len_text - i <= max_length:
+            return text[i + 1 :]
     return text
 
 
@@ -68,6 +69,7 @@ class TaskService(CommonService):
     Attributes:
         model: The Task model class for database operations.
     """
+
     model = Task
 
     @classmethod
@@ -115,10 +117,10 @@ class TaskService(CommonService):
         ]
         docs = (
             cls.model.select(*fields)
-                .join(Document, on=(doc_id == Document.id))
-                .join(Knowledgebase, on=(Document.kb_id == Knowledgebase.id))
-                .join(Tenant, on=(Knowledgebase.tenant_id == Tenant.id))
-                .where(cls.model.id == task_id)
+            .join(Document, on=(doc_id == Document.id))
+            .join(Knowledgebase, on=(Document.kb_id == Knowledgebase.id))
+            .join(Tenant, on=(Knowledgebase.tenant_id == Tenant.id))
+            .where(cls.model.id == task_id)
         )
         docs = list(docs.dicts())
         if not docs:
@@ -163,10 +165,7 @@ class TaskService(CommonService):
             cls.model.digest,
             cls.model.chunk_ids,
         ]
-        tasks = (
-            cls.model.select(*fields).order_by(cls.model.from_page.asc(), cls.model.create_time.desc())
-            .where(cls.model.doc_id == doc_id)
-        )
+        tasks = cls.model.select(*fields).order_by(cls.model.from_page.asc(), cls.model.create_time.desc()).where(cls.model.doc_id == doc_id)
         tasks = list(tasks.dicts())
         if not tasks:
             return None
@@ -187,20 +186,8 @@ class TaskService(CommonService):
             list[dict]: List of task dictionaries containing task details.
                        Returns None if no tasks are found.
         """
-        fields = [
-            cls.model.id,
-            cls.model.doc_id,
-            cls.model.from_page,
-            cls.model.progress,
-            cls.model.progress_msg,
-            cls.model.digest,
-            cls.model.chunk_ids,
-            cls.model.create_time
-        ]
-        tasks = (
-            cls.model.select(*fields).order_by(cls.model.create_time.desc())
-            .where(cls.model.doc_id.in_(doc_ids))
-        )
+        fields = [cls.model.id, cls.model.doc_id, cls.model.from_page, cls.model.progress, cls.model.progress_msg, cls.model.digest, cls.model.chunk_ids, cls.model.create_time]
+        tasks = cls.model.select(*fields).order_by(cls.model.create_time.desc()).where(cls.model.doc_id.in_(doc_ids))
         tasks = list(tasks.dicts())
         if not tasks:
             return None
@@ -236,9 +223,7 @@ class TaskService(CommonService):
         """
         with DB.lock("get_task", -1):
             docs = (
-                cls.model.select(
-                    *[Document.id, Document.kb_id, Document.location, File.parent_id]
-                )
+                cls.model.select(*[Document.id, Document.kb_id, Document.location, File.parent_id])
                 .join(Document, on=(cls.model.doc_id == Document.id))
                 .join(
                     File2Document,
@@ -325,13 +310,7 @@ class TaskService(CommonService):
                 cls.model.update(progress_msg=progress_msg).where(cls.model.id == id).execute()
             if "progress" in info:
                 prog = info["progress"]
-                cls.model.update(progress=prog).where(
-                    (cls.model.id == id) &
-                    (
-                            (cls.model.progress != -1) &
-                            ((prog == -1) | (prog > cls.model.progress))
-                    )
-                ).execute()
+                cls.model.update(progress=prog).where((cls.model.id == id) & ((cls.model.progress != -1) & ((prog == -1) | (prog > cls.model.progress)))).execute()
         else:
             with DB.lock("update_progress", -1):
                 if info["progress_msg"]:
@@ -339,13 +318,7 @@ class TaskService(CommonService):
                     cls.model.update(progress_msg=progress_msg).where(cls.model.id == id).execute()
                 if "progress" in info:
                     prog = info["progress"]
-                    cls.model.update(progress=prog).where(
-                        (cls.model.id == id) &
-                        (
-                            (cls.model.progress != -1) &
-                            ((prog == -1) | (prog > cls.model.progress))
-                        )
-                    ).execute()
+                    cls.model.update(progress=prog).where((cls.model.id == id) & ((cls.model.progress != -1) & ((prog == -1) | (prog > cls.model.progress)))).execute()
 
         process_duration = (datetime.now() - task.begin_at).total_seconds()
         cls.model.update(process_duration=process_duration).where(cls.model.id == id).execute()
@@ -391,7 +364,11 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
     parse_task_array = []
 
     if doc["type"] == FileType.PDF.value:
-        file_bin = settings.STORAGE_IMPL.get(bucket, name)
+        if name and os.path.isabs(name) and os.path.exists(name):
+            with open(name, "rb") as f:
+                file_bin = f.read()
+        else:
+            file_bin = settings.STORAGE_IMPL.get(bucket, name)
         do_layout = doc["parser_config"].get("layout_recognize", "DeepDOC")
         pages = PdfParser.total_page_number(doc["name"], file_bin)
         if pages is None:
@@ -400,8 +377,8 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
         if doc["parser_id"] == "paper":
             page_size = doc["parser_config"].get("task_page_size") or 22
         if doc["parser_id"] in ["one", "knowledge_graph"] or do_layout != "DeepDOC" or doc["parser_config"].get("toc_extraction", False):
-            page_size = 10 ** 9
-        page_ranges = doc["parser_config"].get("pages") or [(1, 10 ** 5)]
+            page_size = 10**9
+        page_ranges = doc["parser_config"].get("pages") or [(1, 10**5)]
         for s, e in page_ranges:
             s -= 1
             s = max(0, s)
@@ -413,7 +390,11 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
                 parse_task_array.append(task)
 
     elif doc["parser_id"] == "table":
-        file_bin = settings.STORAGE_IMPL.get(bucket, name)
+        if name and os.path.isabs(name) and os.path.exists(name):
+            with open(name, "rb") as f:
+                file_bin = f.read()
+        else:
+            file_bin = settings.STORAGE_IMPL.get(bucket, name)
         rn = RAGFlowExcelParser.row_number(doc["name"], file_bin)
         for i in range(0, rn, 3000):
             task = new_task()
@@ -450,8 +431,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
             if pre_task["chunk_ids"]:
                 pre_chunk_ids.extend(pre_task["chunk_ids"].split())
         if pre_chunk_ids:
-            settings.docStoreConn.delete({"id": pre_chunk_ids}, search.index_name(chunking_config["tenant_id"]),
-                                         chunking_config["kb_id"])
+            settings.docStoreConn.delete({"id": pre_chunk_ids}, search.index_name(chunking_config["tenant_id"]), chunking_config["kb_id"])
     DocumentService.update_by_id(doc["id"], {"chunk_num": ck_num})
 
     bulk_insert_into_db(Task, parse_task_array, True)
@@ -459,9 +439,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
 
     unfinished_task_array = [task for task in parse_task_array if task["progress"] < 1.0]
     for unfinished_task in unfinished_task_array:
-        assert REDIS_CONN.queue_product(
-            settings.get_svr_queue_name(priority), message=unfinished_task
-        ), "Can't access Redis. Please check the Redis' status."
+        assert REDIS_CONN.queue_product(settings.get_svr_queue_name(priority), message=unfinished_task), "Can't access Redis. Please check the Redis' status."
 
 
 def reuse_prev_task_chunks(task: dict, prev_tasks: list[dict], chunking_config: dict):
@@ -488,8 +466,7 @@ def reuse_prev_task_chunks(task: dict, prev_tasks: list[dict], chunking_config: 
     idx = 0
     while idx < len(prev_tasks):
         prev_task = prev_tasks[idx]
-        if prev_task.get("from_page", 0) == task.get("from_page", 0) \
-                and prev_task.get("digest", 0) == task.get("digest", ""):
+        if prev_task.get("from_page", 0) == task.get("from_page", 0) and prev_task.get("digest", 0) == task.get("digest", ""):
             break
         idx += 1
 
@@ -500,12 +477,11 @@ def reuse_prev_task_chunks(task: dict, prev_tasks: list[dict], chunking_config: 
         return 0
     task["chunk_ids"] = prev_task["chunk_ids"]
     task["progress"] = 1.0
-    if "from_page" in task and "to_page" in task and int(task['to_page']) - int(task['from_page']) >= 10 ** 6:
+    if "from_page" in task and "to_page" in task and int(task["to_page"]) - int(task["from_page"]) >= 10**6:
         task["progress_msg"] = f"Page({task['from_page']}~{task['to_page']}): "
     else:
         task["progress_msg"] = ""
-    task["progress_msg"] = " ".join(
-        [datetime.now().strftime("%H:%M:%S"), task["progress_msg"], "Reused previous task's chunks."])
+    task["progress_msg"] = " ".join([datetime.now().strftime("%H:%M:%S"), task["progress_msg"], "Reused previous task's chunks."])
     prev_task["chunk_ids"] = ""
 
     return len(task["chunk_ids"].split())
@@ -529,8 +505,7 @@ def has_canceled(task_id):
     return False
 
 
-def queue_dataflow(tenant_id:str, flow_id:str, task_id:str, doc_id:str=CANVAS_DEBUG_DOC_ID, file:dict=None, priority: int=0, rerun:bool=False) -> tuple[bool, str]:
-
+def queue_dataflow(tenant_id: str, flow_id: str, task_id: str, doc_id: str = CANVAS_DEBUG_DOC_ID, file: dict = None, priority: int = 0, rerun: bool = False) -> tuple[bool, str]:
     task = dict(
         id=task_id,
         doc_id=doc_id,
@@ -538,7 +513,7 @@ def queue_dataflow(tenant_id:str, flow_id:str, task_id:str, doc_id:str=CANVAS_DE
         to_page=100000000,
         task_type="dataflow" if not rerun else "dataflow_rerun",
         priority=priority,
-        begin_at= datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        begin_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
     if doc_id not in [CANVAS_DEBUG_DOC_ID, GRAPH_RAPTOR_FAKE_DOC_ID]:
         TaskService.model.delete().where(TaskService.model.doc_id == doc_id).execute()
@@ -550,9 +525,7 @@ def queue_dataflow(tenant_id:str, flow_id:str, task_id:str, doc_id:str=CANVAS_DE
     task["dataflow_id"] = flow_id
     task["file"] = file
 
-    if not REDIS_CONN.queue_product(
-            settings.get_svr_queue_name(priority), message=task
-    ):
+    if not REDIS_CONN.queue_product(settings.get_svr_queue_name(priority), message=task):
         return False, "Can't access Redis. Please check the Redis' status."
 
     return True, ""
