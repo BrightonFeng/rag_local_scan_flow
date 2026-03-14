@@ -133,7 +133,7 @@ class DocumentService(CommonService):
             docs = (
                 cls.model.select(*[*fields, UserCanvas.title.alias("pipeline_name"), User.nickname])
                 .join(File2Document, on=(File2Document.document_id == cls.model.id))
-                .join(File, on=(File.id == File2Document.file_id))
+                .join(File, on=(File.id == File2Document.file_id), join_type=JOIN.LEFT_OUTER)
                 .join(UserCanvas, on=(cls.model.pipeline_id == UserCanvas.id), join_type=JOIN.LEFT_OUTER)
                 .join(User, on=(cls.model.created_by == User.id), join_type=JOIN.LEFT_OUTER)
                 .where((cls.model.kb_id == kb_id), (fn.LOWER(cls.model.name).contains(keywords.lower())))
@@ -143,7 +143,7 @@ class DocumentService(CommonService):
                 cls.model.select(*[*fields, UserCanvas.title.alias("pipeline_name"), User.nickname])
                 .join(File2Document, on=(File2Document.document_id == cls.model.id))
                 .join(UserCanvas, on=(cls.model.pipeline_id == UserCanvas.id), join_type=JOIN.LEFT_OUTER)
-                .join(File, on=(File.id == File2Document.file_id))
+                .join(File, on=(File.id == File2Document.file_id), join_type=JOIN.LEFT_OUTER)
                 .join(User, on=(cls.model.created_by == User.id), join_type=JOIN.LEFT_OUTER)
                 .where(cls.model.kb_id == kb_id)
             )

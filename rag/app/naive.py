@@ -263,6 +263,39 @@ class Docx(DocxParser):
     def __init__(self):
         pass
 
+    def get_picture(self, document, paragraph):
+        from io import BytesIO
+        import logging as doc_log
+
+        imgs = paragraph._element.xpath(".//pic:pic")
+        if not imgs:
+            return None
+        image_blobs = []
+        for img in imgs:
+            embed = img.xpath(".//a:blip/@r:embed")
+            if not embed:
+                continue
+            embed = embed[0]
+            image_blob = None
+            try:
+                related_part = document.part.related_parts[embed]
+            except Exception as e:
+                doc_log.warning(f"Skipping image due to unexpected error getting related_part: {e}")
+                continue
+
+            try:
+                image = related_part.image
+                if image is not None:
+                    image_blob = image.blob
+            except Exception as e:
+                doc_log.info(f"Damaged image encountered, attempting blob fallback: {e}")
+            if image_blob:
+                image_blobs.append(image_blob)
+
+        if not image_blobs:
+            return None
+        return image_blobs[0]
+
     def __clean(self, line):
         line = re.sub(r"\u3000", " ", line).strip()
         return line

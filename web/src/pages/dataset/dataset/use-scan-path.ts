@@ -9,6 +9,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ScannedDirectory {
   id: string;
@@ -20,6 +21,7 @@ interface ScannedDirectory {
 }
 
 export const useScanPath = (kbId: string) => {
+  const { t } = useTranslation();
   const {
     visible: scanPathVisible,
     hideModal: hideScanPathModal,
@@ -66,11 +68,13 @@ export const useScanPath = (kbId: string) => {
         if (innerData && innerData.code === 0) {
           const imported = innerData.data?.imported || [];
           if (imported.length > 0) {
-            message.success(`Successfully scanned ${imported.length} files`);
-          } else {
-            message.info(
-              innerData.message || 'No files found in the specified path',
+            message.success(
+              t('scanDirectory.successfullyScanned', {
+                count: imported.length,
+              }),
             );
+          } else {
+            message.info(innerData.message || t('scanDirectory.noFilesFound'));
           }
           loadDirectories();
           queryClient.invalidateQueries({
@@ -78,14 +82,14 @@ export const useScanPath = (kbId: string) => {
           });
           hideScanPathModal();
         } else {
-          const errMsg = innerData?.message || 'Failed to scan path';
+          const errMsg = innerData?.message || t('scanDirectory.failedToScan');
           message.error(errMsg);
         }
       } catch (error: any) {
         const errMsg =
           error?.response?.data?.message ||
           error?.message ||
-          'Failed to scan path';
+          t('scanDirectory.failedToScan');
         message.error(errMsg);
       } finally {
         setLoading(false);
@@ -99,16 +103,18 @@ export const useScanPath = (kbId: string) => {
       try {
         const res = await deleteScannedDirectory(id);
         if (res.data && res.data.code === 0) {
-          message.success('Directory removed from scan list');
+          message.success(t('scanDirectory.directoryRemoved'));
           loadDirectories();
         } else {
-          message.error(res.data?.message || 'Failed to delete');
+          message.error(res.data?.message || t('scanDirectory.failedToDelete'));
         }
       } catch (error: any) {
-        message.error(error?.response?.data?.message || 'Failed to delete');
+        message.error(
+          error?.response?.data?.message || t('scanDirectory.failedToDelete'),
+        );
       }
     },
-    [loadDirectories],
+    [loadDirectories, t],
   );
 
   const onUpdateInterval = useCallback(
@@ -116,16 +122,18 @@ export const useScanPath = (kbId: string) => {
       try {
         const res = await updateScannedDirectory(id, interval);
         if (res.data && res.data.code === 0) {
-          message.success('Scan interval updated');
+          message.success(t('scanDirectory.intervalUpdated'));
           loadDirectories();
         } else {
-          message.error(res.data?.message || 'Failed to update');
+          message.error(res.data?.message || t('scanDirectory.failedToUpdate'));
         }
       } catch (error: any) {
-        message.error(error?.response?.data?.message || 'Failed to update');
+        message.error(
+          error?.response?.data?.message || t('scanDirectory.failedToUpdate'),
+        );
       }
     },
-    [loadDirectories],
+    [loadDirectories, t],
   );
 
   return {

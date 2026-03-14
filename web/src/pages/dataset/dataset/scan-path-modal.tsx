@@ -12,6 +12,7 @@ import { DeleteOutlined } from '@ant-design/icons';
 import { Alert, Form, Input, Select, Table, Tag } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ScannedDirectory {
   id: string;
@@ -41,6 +42,7 @@ const ScanPathModal: React.FC<IProps> = ({
   onDelete,
   onUpdateInterval,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
 
   const handleOk = async () => {
@@ -60,20 +62,22 @@ const ScanPathModal: React.FC<IProps> = ({
 
   const columns = [
     {
-      title: 'Directory Path',
+      title: t('scanDirectory.directoryPath'),
       dataIndex: 'directory_path',
       key: 'directory_path',
       ellipsis: true,
     },
     {
-      title: 'Last Scan',
+      title: t('scanDirectory.lastScan'),
       dataIndex: 'last_scan_time',
       key: 'last_scan_time',
       render: (time: string | null) =>
-        time ? dayjs(time).format('YYYY-MM-DD HH:mm') : 'Never',
+        time
+          ? dayjs(time).format('YYYY-MM-DD HH:mm:ss')
+          : t('scanDirectory.never'),
     },
     {
-      title: 'Interval',
+      title: t('scanDirectory.interval'),
       dataIndex: 'scan_interval_minutes',
       key: 'scan_interval_minutes',
       width: 100,
@@ -102,7 +106,7 @@ const ScanPathModal: React.FC<IProps> = ({
           type="button"
           onClick={() => onDelete?.(record.id)}
           className="text-red-500 hover:text-red-600 p-1 rounded"
-          title="Delete"
+          title={t('scanDirectory.delete')}
         >
           <DeleteOutlined />
         </button>
@@ -114,13 +118,15 @@ const ScanPathModal: React.FC<IProps> = ({
     <Dialog open={visible} onOpenChange={handleCancel}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Scan Local Directory</DialogTitle>
+          <DialogTitle>{t('scanDirectory.title')}</DialogTitle>
         </DialogHeader>
 
         {directories.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm">Previously Scanned</span>
+              <span className="font-medium text-sm">
+                {t('scanDirectory.previouslyScanned')}
+              </span>
               <Tag color="blue">{directories.length}</Tag>
             </div>
             <Table
@@ -130,14 +136,14 @@ const ScanPathModal: React.FC<IProps> = ({
               size="small"
               pagination={false}
               locale={{
-                emptyText: 'No directories scanned yet',
+                emptyText: t('scanDirectory.noDirectoriesScanned'),
               }}
             />
           </div>
         )}
 
         <Alert
-          message="Note: This feature scans files from the server's local filesystem."
+          message={t('scanDirectory.note')}
           type="info"
           showIcon
           className="mb-4"
@@ -145,27 +151,28 @@ const ScanPathModal: React.FC<IProps> = ({
 
         <Form form={form} name="scan_path" layout="vertical" autoComplete="off">
           <Form.Item
-            label="Directory Path"
+            label={t('scanDirectory.directoryPath')}
             name="path"
             rules={[
-              { required: true, message: 'Please input directory path!' },
+              { required: true, message: t('scanDirectory.pathPlaceholder') },
             ]}
           >
-            <Input placeholder="/path/to/directory" />
+            <Input placeholder={t('scanDirectory.pathPlaceholder')} />
           </Form.Item>
 
           <Form.Item
-            label="Scan Interval"
+            label={t('scanDirectory.scanInterval')}
             name="scan_interval"
             initialValue={60}
           >
             <Select
               style={{ width: '100%' }}
+              getPopupContainer={(trigger) => trigger.parentElement!}
               options={[
-                { label: 'Every 30 minutes', value: 30 },
-                { label: 'Every 1 hour', value: 60 },
-                { label: 'Every 3 hours', value: 180 },
-                { label: 'Every day', value: 1440 },
+                { label: t('scanDirectory.every30Minutes'), value: 30 },
+                { label: t('scanDirectory.every1Hour'), value: 60 },
+                { label: t('scanDirectory.every3Hours'), value: 180 },
+                { label: t('scanDirectory.everyDay'), value: 1440 },
               ]}
             />
           </Form.Item>
@@ -173,10 +180,10 @@ const ScanPathModal: React.FC<IProps> = ({
 
         <DialogFooter>
           <ButtonLoading variant="outline" onClick={handleCancel}>
-            Cancel
+            {t('scanDirectory.cancel')}
           </ButtonLoading>
           <ButtonLoading loading={parentLoading} onClick={handleOk}>
-            Scan
+            {t('scanDirectory.scan')}
           </ButtonLoading>
         </DialogFooter>
       </DialogContent>

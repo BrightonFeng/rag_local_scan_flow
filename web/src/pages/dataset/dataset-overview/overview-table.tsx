@@ -40,7 +40,13 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { TFunction } from 'i18next';
-import { ArrowUpDown, ClipboardList, Eye, MonitorUp } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ClipboardList,
+  Eye,
+  HardDrive,
+  MonitorUp,
+} from 'lucide-react';
 import { FC, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 import { RunningStatus } from '../dataset/constant';
@@ -114,13 +120,28 @@ export const getFileLogsTableColumns = (
           dataSourceInfo?.[
             row.original.source_from as keyof typeof dataSourceInfo
           ];
+        const isLocalPath = row.original.source_from === 'local_path';
         return (
           <div className="text-text-primary">
-            {row.original.source_from === 'local' ||
-            row.original.source_from === '' ? (
-              <div className="bg-accent-primary-5 w-6 h-6 rounded-full flex items-center justify-center">
-                <MonitorUp className="text-accent-primary" size={16} />
-              </div>
+            {isLocalPath ? (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <div className="bg-orange-100 w-6 h-6 rounded-full flex items-center justify-center">
+                    <HardDrive className="text-orange-500" size={16} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{t('sourceLocalPath')}</TooltipContent>
+              </Tooltip>
+            ) : row.original.source_from === 'local' ||
+              row.original.source_from === '' ? (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <div className="bg-accent-primary-5 w-6 h-6 rounded-full flex items-center justify-center">
+                    <MonitorUp className="text-accent-primary" size={16} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{t('sourceLocal')}</TooltipContent>
+              </Tooltip>
             ) : sourceInfo?.icon ? (
               <div className="w-6 h-6 flex items-center justify-center">
                 {sourceInfo.icon}

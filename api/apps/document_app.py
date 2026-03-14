@@ -242,6 +242,10 @@ async def list_docs():
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
 
+    import logging
+
+    logging.info(f"List docs request: kb_id={kb_id}, user={current_user.id}")
+
     tenants = UserTenantService.query(user_id=current_user.id)
     for tenant in tenants:
         if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
@@ -347,6 +351,8 @@ async def list_docs():
             doc_ids_filter,
             return_empty_metadata=return_empty_metadata,
         )
+
+        logging.info(f"List docs result: kb_id={kb_id}, total={tol}, docs_count={len(docs)}")
 
         if create_time_from or create_time_to:
             filtered_docs = []
@@ -952,6 +958,147 @@ async def upload_info():
         return server_error_response(e)
 
 
+def do_scan_path(kb_id, path, scan_interval=60):
+    """
+    Core scanning logic that can be called from both API and background threads.
+    """
+    import logging
+    from uuid import uuid4
+    from datetime import datetime
+    from api.db.services.knowledgebase_service import KnowledgebaseService
+    from api.db.services.document_service import DocumentService
+    from api.db.services.file_service import FileService
+    from api.db.services.file2document_service import File2DocumentService
+    from api.db.services.scanned_directory_service import ScannedDirectoryService
+    from api.db.db_models import File, File2Document, Document
+
+    logging.info(f"Starting auto-scan for path: {path}, kb_id: {kb_id}")
+
+    e, kb = KnowledgebaseService.get_by_id(kb_id)
+    if not e:
+        logging.error(f"Knowledgebase not found: {kb_id}")
+        return
+
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        logging.error(f"Path does not exist: {path}")
+        return
+    if not os.path.isdir(path):
+        logging.error(f"Path is not a directory: {path}")
+        return
+
+    supported_extensions = (
+        r".*\.pdf$|"
+        r".*\.(msg|eml|doc|docx|ppt|pptx|yml|xml|htm|json|jsonl|ldjson|csv|txt|ini|xls|xlsx|wps|rtf|hlp|pages|numbers|key|md|py|js|java|c|cpp|h|php|go|ts|sh|cs|kt|html|sql)$|"
+        r".*\.(wav|flac|ape|alac|wv|mp3|aac|ogg|vorbis|opus)$|"
+        r".*\.(jpg|jpeg|png|tif|gif|pcx|tga|exif|fpx|svg|psd|cdr|pcd|dxf|ufo|eps|ai|raw|webp|avif|apng|icon|ico|mpg|mpeg|avi|rm|rmvb|mov|wmv|asf|dat|asx|wvx|mpe|mpa|mp4|avi|mkv)$"
+    )
+
+    files_to_import = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if re.match(supported_extensions, file, re.IGNORECASE):
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, path)
+                files_to_import.append((file_path, rel_path))
+
+    if not files_to_import:
+        logging.info(f"No supported files found in: {path}")
+        ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
+        return
+
+    existing_dirs = ScannedDirectoryService.get_by_kb_id(kb_id)
+    scan_dir_id = None
+    for existing_dir in existing_dirs:
+        if existing_dir.directory_path == path:
+            scan_dir_id = existing_dir.id
+            break
+
+    if not scan_dir_id:
+        new_id = uuid4().hex
+        scan_dir_id = new_id
+        ScannedDirectoryService.insert(
+            id=new_id,
+            kb_id=kb_id,
+            directory_path=path,
+            scan_interval_minutes=scan_interval,
+            created_by=kb.tenant_id,
+        )
+
+    imported_docs = []
+    for file_path, rel_path in files_to_import:
+        try:
+            existing_docs = list(DocumentService.query(kb_id=kb.id, location=file_path))
+            if existing_docs:
+                for existing_doc in existing_docs:
+                    try:
+                        File2DocumentService.delete_by_document_id(existing_doc.id)
+                    except:
+                        pass
+                    try:
+                        File.delete_by_id(existing_doc.id)
+                    except:
+                        pass
+                    try:
+                        Document.delete_by_id(existing_doc.id)
+                    except:
+                        pass
+
+            filename = os.path.basename(file_path)
+            doc_id = uuid4().hex
+
+            doc = {
+                "id": doc_id,
+                "kb_id": kb.id,
+                "parser_id": kb.parser_id,
+                "pipeline_id": kb.pipeline_id,
+                "parser_config": kb.parser_config,
+                "created_by": kb.tenant_id,
+                "type": filename.split(".")[-1] if "." in filename else "",
+                "name": filename,
+                "source_type": "local_path",
+                "suffix": filename.split(".")[-1] if "." in filename else "",
+                "location": file_path,
+                "size": os.path.getsize(file_path),
+                "thumbnail": "",
+                "content_hash": "",
+                "run": "1",
+                "status": "1",
+                "progress": 0,
+            }
+            DocumentService.insert(doc)
+
+            kb_folder = FileService.get_kb_folder(kb.tenant_id)
+            parent_id = kb_folder.get("id")
+
+            file_rec = {
+                "id": doc_id,
+                "parent_id": parent_id,
+                "tenant_id": kb.tenant_id,
+                "created_by": kb.tenant_id,
+                "name": filename,
+                "location": file_path,
+                "size": os.path.getsize(file_path),
+                "type": filename.split(".")[-1] if "." in filename else "",
+                "source_type": "",
+            }
+            File.insert(**file_rec).execute()
+
+            try:
+                File2Document.insert(id=doc_id, document_id=doc_id, file_id=doc_id).execute()
+            except Exception:
+                pass
+
+            doc["tenant_id"] = kb.tenant_id
+            DocumentService.run(kb.tenant_id, doc, {})
+            imported_docs.append(doc_id)
+        except Exception as e:
+            logging.error(f"Failed to process file {rel_path}: {str(e)}")
+
+    ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
+    logging.info(f"Auto-scan completed: {len(imported_docs)} files imported from {path}")
+
+
 @manager.route("/scan_path", methods=["POST"])
 @login_required
 @validate_request("kb_id", "path")
@@ -991,7 +1138,18 @@ async def scan_path():
             scan_dir_id = existing_dir.id
             break
     else:
-        scan_dir_id = ScannedDirectoryService.add(kb_id, path, scan_interval, current_user.id)
+        from uuid import uuid4
+
+        new_id = uuid4().hex
+        scan_dir_id = new_id
+        ScannedDirectoryService.insert(
+            id=new_id,
+            kb_id=kb_id,
+            directory_path=path,
+            scan_interval_minutes=scan_interval,
+            created_by=current_user.id,
+        )
+        ScannedDirectoryService.update_last_scan_time(scan_dir_id)
 
     supported_extensions = (
         r".*\.pdf$|"
@@ -1021,10 +1179,33 @@ async def scan_path():
 
     import logging
 
-    logging.info(f"Scan path: kb.id={kb.id}, kb_id={kb_id}, user={current_user.id}")
+    logging.info(f"Scan path: kb.id={kb.id}, kb_id={kb_id}, kb.name={kb.name}, user={current_user.id}, tenant_id={kb.tenant_id}")
+
+    from api.db.services.file_service import FileService
+    from api.db.db_models import File, File2Document, Document
 
     for file_path, rel_path in files_to_import:
         try:
+            from api.db.services.document_service import DocumentService
+            from api.db.services.file2document_service import File2DocumentService
+
+            existing_docs = list(DocumentService.query(kb_id=kb.id, location=file_path))
+            if existing_docs:
+                logging.info(f"Document already exists for location: {file_path}, deleting old records first")
+                for existing_doc in existing_docs:
+                    try:
+                        File2DocumentService.delete_by_document_id(existing_doc.id)
+                    except:
+                        pass
+                    try:
+                        File.delete_by_id(existing_doc.id)
+                    except:
+                        pass
+                    try:
+                        Document.delete_by_id(existing_doc.id)
+                    except:
+                        pass
+
             filename = os.path.basename(file_path)
             from uuid import uuid4
 
@@ -1053,10 +1234,7 @@ async def scan_path():
             try:
                 DocumentService.insert(doc)
 
-                from api.db.services.file_service import FileService
-                from api.db.db_models import File, File2Document
-
-                kb_folder = FileService.get_kb_folder(current_user.id)
+                kb_folder = FileService.get_kb_folder(kb.tenant_id)
                 parent_id = kb_folder.get("id")
 
                 file_rec = {
@@ -1068,11 +1246,18 @@ async def scan_path():
                     "location": file_path,
                     "size": os.path.getsize(file_path),
                     "type": filename.split(".")[-1] if "." in filename else "",
-                    "source_type": "local",
+                    "source_type": "",
                 }
                 File.insert(**file_rec).execute()
 
-                File2Document.insert(document_id=doc_id, file_id=doc_id).execute()
+                try:
+                    f2d_id = doc_id  # Use same ID as doc_id for simplicity
+                    File2Document.insert(id=f2d_id, document_id=doc_id, file_id=doc_id).execute()
+                except Exception as f2d_err:
+                    if "Duplicate" in str(f2d_err):
+                        logging.warning(f"File2Document already exists for doc_id={doc_id}, skipping")
+                    else:
+                        raise
 
                 doc["run"] = "1"
                 doc["tenant_id"] = kb.tenant_id
@@ -1106,20 +1291,57 @@ async def get_scanned_directories():
         return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
     from api.db.services.scanned_directory_service import ScannedDirectoryService
+    from datetime import datetime, timedelta
+    import threading
+
+    def check_and_trigger_scan():
+        try:
+            directories = ScannedDirectoryService.get_by_kb_id(kb_id)
+            now = datetime.now()
+            for d in directories:
+                if d.last_scan_time:
+                    time_since_last_scan = (now - d.last_scan_time).total_seconds() / 60
+                    if time_since_last_scan >= d.scan_interval_minutes:
+                        logging.info(f"Triggering auto-scan for directory: {d.directory_path}, kb_id={kb_id}")
+                        try:
+                            do_scan_path(kb_id, d.directory_path, d.scan_interval_minutes)
+                        except Exception as scan_err:
+                            logging.error(f"Auto-scan failed for {d.directory_path}: {str(scan_err)}")
+        except Exception as e:
+            logging.error(f"Error in background scan check: {str(e)}")
+
+    scan_thread = threading.Thread(target=check_and_trigger_scan, daemon=True)
+    scan_thread.start()
 
     directories = ScannedDirectoryService.get_by_kb_id(kb_id)
     result = []
     for d in directories:
+        last_scan = d.last_scan_time
+        if last_scan:
+            last_scan_time = last_scan.isoformat() if hasattr(last_scan, "isoformat") else str(last_scan)
+        else:
+            last_scan_time = None
+
+        created = d.created_at
+        if created:
+            created_at = created.isoformat() if hasattr(created, "isoformat") else str(created)
+        else:
+            created_at = None
+
         result.append(
             {
                 "id": d.id,
                 "kb_id": d.kb_id,
                 "directory_path": d.directory_path,
                 "scan_interval_minutes": d.scan_interval_minutes,
-                "last_scan_time": d.last_scan_time.isoformat() if d.last_scan_time else None,
-                "created_at": d.created_at.isoformat() if d.created_at else None,
+                "last_scan_time": last_scan_time,
+                "created_at": created_at,
             }
         )
+
+    import logging
+
+    logging.info(f"Returning scanned directories: {result}")
 
     return get_json_result(data=result)
 
@@ -1127,7 +1349,7 @@ async def get_scanned_directories():
 @manager.route("/scanned_directories/<directory_id>", methods=["DELETE"])
 @login_required
 async def delete_scanned_directory(directory_id):
-    """Delete a scanned directory from the scan list (does not delete actual files)."""
+    """Delete a scanned directory from the scan list and all associated documents."""
     from api.db.services.scanned_directory_service import ScannedDirectoryService
 
     success, directory = ScannedDirectoryService.get_by_id(directory_id)
@@ -1140,9 +1362,41 @@ async def delete_scanned_directory(directory_id):
     if not check_kb_team_permission(kb, current_user.id):
         return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
+    import logging
+
+    logging.info(f"Deleting scanned directory: {directory.directory_path}, kb_id={kb.id}")
+
+    from api.db.services.document_service import DocumentService
+    from api.db.services.file2document_service import File2DocumentService
+    from api.db.db_models import File, Document
+
+    deleted_docs = 0
+    dir_path = directory.directory_path
+
+    all_docs = list(DocumentService.query(kb_id=kb.id))
+    for doc in all_docs:
+        if doc.location and doc.location.startswith(dir_path):
+            doc_id = doc.id
+            logging.info(f"Deleting document: {doc_id}, location={doc.location}")
+            try:
+                File2DocumentService.delete_by_document_id(doc_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete File2Document for doc {doc_id}: {e}")
+            try:
+                File.delete_by_id(doc_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete File {doc_id}: {e}")
+            try:
+                Document.delete_by_id(doc_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete Document {doc_id}: {e}")
+            deleted_docs += 1
+
+    logging.info(f"Deleted {deleted_docs} documents from scanned directory")
+
     ScannedDirectoryService.delete_by_id(directory_id)
 
-    return get_json_result(data={"deleted": True})
+    return get_json_result(data={"deleted": True, "documents_deleted": deleted_docs})
 
 
 @manager.route("/scanned_directories/<directory_id>", methods=["PUT"])

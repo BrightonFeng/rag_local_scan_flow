@@ -229,7 +229,7 @@ export default function Dataset() {
           </DropdownMenu>
           <Button size="default" onClick={() => showScanPathModal()}>
             <Upload />
-            Scan Local Directory
+            {t('scanDirectory.title')}
           </Button>
         </ListFilterBar>
 

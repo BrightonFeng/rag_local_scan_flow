@@ -10,6 +10,11 @@ class ScannedDirectoryService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def get_all(cls):
+        return list(cls.model.select())
+
+    @classmethod
+    @DB.connection_context()
     def get_by_kb_id(cls, kb_id):
         return list(cls.model.select().where(cls.model.kb_id == kb_id))
 
@@ -30,12 +35,17 @@ class ScannedDirectoryService(CommonService):
     @classmethod
     @DB.connection_context()
     def update_last_scan_time(cls, directory_id):
-        cls.model.update(id=directory_id, last_scan_time=datetime.now()).execute()
+        cls.model.update(last_scan_time=datetime.now()).where(cls.model.id == directory_id).execute()
+
+    @classmethod
+    @DB.connection_context()
+    def update_last_scan_time_by_path(cls, kb_id, directory_path):
+        cls.model.update(last_scan_time=datetime.now()).where((cls.model.kb_id == kb_id) & (cls.model.directory_path == directory_path)).execute()
 
     @classmethod
     @DB.connection_context()
     def update_scan_interval(cls, directory_id, scan_interval_minutes):
-        cls.model.update(id=directory_id, scan_interval_minutes=scan_interval_minutes).execute()
+        cls.model.update(scan_interval_minutes=scan_interval_minutes).where(cls.model.id == directory_id).execute()
 
     @classmethod
     @DB.connection_context()
