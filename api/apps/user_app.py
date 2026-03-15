@@ -109,10 +109,13 @@ async def login():
         )
 
     password = json_body.get("password")
-    try:
-        password = decrypt(password)
-    except BaseException:
-        return get_json_result(data=False, code=RetCode.SERVER_ERROR, message="Fail to crypt password")
+    if password and password.startswith("plain:"):
+        password = password[6:]
+    else:
+        try:
+            password = decrypt(password)
+        except BaseException:
+            return get_json_result(data=False, code=RetCode.SERVER_ERROR, message="Fail to crypt password")
 
     user = UserService.query_user(email, password)
 

@@ -21,7 +21,7 @@ RAGFlow supports scanning directories on the server's local filesystem and impor
 | Feature | Traditional Upload | Local Directory Scan |
 |---------|------------------|---------------------|
 | Storage | Files stored in MinIO | Only file paths and index vector stored |
-| File access | Through RAGFlow | Direct filesystem access |
+| File access | Through MinIO database | Direct filesystem access |
 | Auto-sync | Manual re-upload | Configurable automatic scan |
 | Storage cost | Uses MinIO storage | No additional storage |
 
@@ -55,11 +55,11 @@ The feature supports a wide range of file types:
 
 ### 4. Managing Scanned Directories
 
-After scanning, you can:
+After first scanning, you can:
 
 - **View scanned directories**: See all directories linked to the knowledge base
 - **Update scan interval**: Change how often automatic scanning occurs
-- **Remove directories**: Delete a directory from the scan list
+- **Remove directories**: Delete a directory from the scan list (will delete relative files from the knowledge base).
 
 ## Synchronization Logic
 
@@ -67,7 +67,7 @@ The scanner automatically handles file changes in the scanned directory:
 
 1. **New files**: If a new file is added to the directory, it will be added to the database and parsing will be triggered automatically.
 
-2. **Modified files**: If a scanned file is modified (detected by file size change), the existing record will be deleted and re-parsing will be triggered.
+2. **Modified files**: If a scanned file is modified (detected by file size change), the existing record will be updated and re-parsing will be triggered.
 
 3. **Deleted files**: If a file is deleted from the local directory, the corresponding record in the database will be automatically removed.
 
@@ -75,7 +75,7 @@ The scanner automatically handles file changes in the scanned directory:
 
 ## Viewing Scanned Files
 
-Clicking on a reference document in chat will open the file in a new browser window. The file is read directly from the local filesystem, supporting automatic encoding detection (UTF-8, GBK, etc.).
+Clicking on a reference document in chat will open the file in a new browser window. The file is read directly from the local filesystem.
 
 ## Notes
 
