@@ -1322,6 +1322,7 @@ export default {
       every3Hours: '每3小時',
       everyDay: '每天',
       everyWeek: '每週',
+      every4Weeks: '每4週',
       successfullyScanned: '成功掃描 {{count}} 個檔案',
       noFilesFound: '指定路徑中未找到檔案',
       failedToScan: '掃描路徑失敗',

@@ -2770,6 +2770,7 @@ Important structured information may include: names, dates, locations, events, k
       every3Hours: 'Every 3 hours',
       everyDay: 'Every day',
       everyWeek: 'Every week',
+      every4Weeks: 'Every 4 weeks',
       successfullyScanned: 'Successfully scanned {{count}} files',
       noFilesFound: 'No files found in the specified path',
       failedToScan: 'Failed to scan path',

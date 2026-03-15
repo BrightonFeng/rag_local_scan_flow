@@ -95,6 +95,7 @@ const ScanPathModal: React.FC<IProps> = ({
             { label: '3h', value: 180 },
             { label: '1d', value: 1440 },
             { label: '1w', value: 10080 },
+            { label: '4w', value: 40320 },
           ]}
         />
       ),
@@ -165,7 +166,7 @@ const ScanPathModal: React.FC<IProps> = ({
           <Form.Item
             label={t('scanDirectory.scanInterval')}
             name="scan_interval"
-            initialValue={10080}
+            initialValue={40320}
           >
             <Select
               style={{ width: '100%' }}
@@ -177,6 +178,7 @@ const ScanPathModal: React.FC<IProps> = ({
                 { label: t('scanDirectory.every3Hours'), value: 180 },
                 { label: t('scanDirectory.everyDay'), value: 1440 },
                 { label: t('scanDirectory.everyWeek'), value: 10080 },
+                { label: t('scanDirectory.every4Weeks'), value: 40320 },
               ]}
             />
           </Form.Item>

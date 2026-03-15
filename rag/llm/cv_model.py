@@ -743,16 +743,80 @@ class OllamaCV(Base):
         except Exception as e:
             return "**ERROR**: " + str(e), 0
 
-    async def async_chat(self, system, history, gen_conf, images=None, **kwargs):
+    async def async_chat(self, system, history, gen_conf, images=None, video_bytes=None, filename="", **kwargs):
+        if video_bytes:
+            try:
+                summary, summary_num_tokens = self._process_video(video_bytes, filename, "")
+                return summary, summary_num_tokens
+            except Exception as e:
+                return "**ERROR**: " + str(e), 0
+
         try:
             response = await thread_pool_exec(
                 self.client.chat, model=self.model_name, messages=self._form_history(system, history, images), options=self._clean_conf(gen_conf), keep_alive=self.keep_alive
             )
 
             ans = response["message"]["content"].strip()
-            return ans, response["eval_count"] + response.get("prompt_eval_count", 0)
+            eval_count = response.get("eval_count") or 0
+            prompt_eval_count = response.get("prompt_eval_count") or 0
+            return ans, eval_count + prompt_eval_count
         except Exception as e:
             return "**ERROR**: " + str(e), 0
+
+    def _process_video(self, video_bytes, filename, prompt):
+        import subprocess
+        import cv2
+        import numpy as np
+
+        video_suffix = Path(filename).suffix or ".mp4"
+        tmp_path = None
+        with tempfile.NamedTemporaryFile(delete=False, suffix=video_suffix) as tmp:
+            tmp.write(video_bytes)
+            tmp_path = tmp.name
+
+        try:
+            cap = cv2.VideoCapture(tmp_path)
+            frames = []
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            interval = max(1, total_frames // 8)
+
+            frame_count = 0
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                if frame_count % interval == 0:
+                    _, buffer = cv2.imencode(".jpg", frame)
+                    frames.append(base64.b64encode(buffer).decode("utf-8"))
+                frame_count += 1
+                if len(frames) >= 8:
+                    break
+            cap.release()
+
+            if not frames:
+                return "No frames extracted from video", 0
+
+            user_prompt = prompt or "请详细描述这个视频中正在发生的画面内容。"
+            messages = [{"role": "user", "content": user_prompt, "images": frames}]
+
+            response = self.client.chat(model=self.model_name, messages=messages, keep_alive=self.keep_alive)
+
+            ans = response["message"]["content"].strip()
+            if not ans:
+                thinking = response["message"].get("thinking", "").strip()
+                if thinking:
+                    lines = [l for l in thinking.split("\n") if l.strip() and not l.strip().startswith(("So,", "First,", "Then,", "The", "In", "But"))]
+                    if lines:
+                        ans = " ".join(lines[:5])
+                    else:
+                        ans = thinking[-1500:] if len(thinking) > 1500 else thinking
+            return ans, 128
+        except Exception as e:
+            return "**ERROR**: " + str(e), 0
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
     async def async_chat_streamly(self, system, history, gen_conf, images=None, **kwargs):
         ans = ""
