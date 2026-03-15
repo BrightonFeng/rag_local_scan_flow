@@ -1230,15 +1230,45 @@ async def scan_path():
     from api.db.services.file_service import FileService
     from api.db.db_models import File, File2Document, Document
 
+    current_file_paths = set()
     for file_path, rel_path in files_to_import:
-        try:
-            from api.db.services.document_service import DocumentService
-            from api.db.services.file2document_service import File2DocumentService
+        current_file_paths.add(file_path)
 
-            existing_docs = list(DocumentService.query(kb_id=kb.id, location=file_path))
-            if existing_docs:
-                logging.info(f"Document already exists for location: {file_path}, deleting old records first")
-                for existing_doc in existing_docs:
+    existing_docs = list(DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value))
+    deleted_count = 0
+    skipped_count = 0
+    reparsed_count = 0
+
+    for existing_doc in existing_docs:
+        doc_location = existing_doc.location
+        if not doc_location or not doc_location.startswith(path):
+            continue
+
+        if doc_location not in current_file_paths:
+            try:
+                File2DocumentService.delete_by_document_id(existing_doc.id)
+            except:
+                pass
+            try:
+                File.delete_by_id(existing_doc.id)
+            except:
+                pass
+            try:
+                Document.delete_by_id(existing_doc.id)
+            except:
+                pass
+            deleted_count += 1
+            logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
+        else:
+            try:
+                file_stat = os.stat(doc_location)
+                if existing_doc.size == file_stat.st_size:
+                    skipped_count += 1
+                    logging.info(f"Skipped (unchanged): {existing_doc.name}, size: {file_stat.st_size}")
+                    continue
+                else:
+                    reparsed_count += 1
+                    logging.info(f"Re-parsing (modified): {existing_doc.name}, old size: {existing_doc.size}, new size: {file_stat.st_size}")
                     try:
                         File2DocumentService.delete_by_document_id(existing_doc.id)
                     except:
@@ -1251,6 +1281,20 @@ async def scan_path():
                         Document.delete_by_id(existing_doc.id)
                     except:
                         pass
+            except OSError:
+                pass
+
+    logging.info(f"Scan summary: deleted={deleted_count}, skipped={skipped_count}, reparsed={reparsed_count}, new={len(files_to_import) - skipped_count - reparsed_count}")
+
+    for file_path, rel_path in files_to_import:
+        try:
+            from api.db.services.document_service import DocumentService
+            from api.db.services.file2document_service import File2DocumentService
+
+            existing_docs = list(DocumentService.query(kb_id=kb.id, location=file_path))
+            if existing_docs:
+                skipped_count += 1
+                continue
 
             filename = os.path.basename(file_path)
             from uuid import uuid4
@@ -1329,7 +1373,7 @@ async def scan_path():
             logging.error(f"Failed to process file: {str(e)}")
             errors.append(f"{rel_path}: {str(e)}")
 
-    return get_json_result(data={"imported": imported_docs, "errors": errors, "scan_dir_id": scan_dir_id})
+    return get_json_result(data={"imported": imported_docs, "errors": errors, "scan_dir_id": scan_dir_id, "deleted": deleted_count, "skipped": skipped_count, "reparsed": reparsed_count})
 
 
 @manager.route("/scanned_directories", methods=["GET"])
