@@ -116,6 +116,8 @@ export interface IReferenceChunk {
   term_similarity: number;
   positions: number[];
   doc_type?: string;
+  source_type?: string;
+  location?: string;
 }
 
 export interface IReference {

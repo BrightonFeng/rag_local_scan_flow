@@ -161,6 +161,8 @@ export interface ITestingChunk {
   positions: number[][];
   docnm_kwd: string;
   doc_type_kwd: string;
+  source_type?: string;
+  location?: string;
 }
 
 export interface ITestingDocument {

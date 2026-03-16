@@ -14,6 +14,8 @@ import {
 import { RAGFlowPagination } from '@/components/ui/ragflow-pagination';
 import { IReference } from '@/interfaces/database/chat';
 import { cn } from '@/lib/utils';
+import { api_host } from '@/utils/api';
+import { getAuthorization } from '@/utils/authorization-util';
 import { citationMarkerReg } from '@/utils/citation-utils';
 import { getDirAttribute } from '@/utils/text-direction';
 import DOMPurify from 'dompurify';
@@ -245,12 +247,27 @@ export default function SearchingView({
                           </div>
                           <div
                             className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit mt-3"
-                            onClick={() =>
-                              clickDocumentButton(chunk.doc_id, chunk as any)
-                            }
+                            onClick={() => {
+                              if (
+                                chunk.source_type === 'local_scan' &&
+                                chunk.location
+                              ) {
+                                const auth = getAuthorization();
+                                const docUrl = `${api_host}/document/get/${chunk.doc_id}`;
+                                const urlWithAuth = auth
+                                  ? `${docUrl}?jwt_auth=${encodeURIComponent(auth)}`
+                                  : docUrl;
+                                window.open(urlWithAuth, '_blank');
+                              } else {
+                                clickDocumentButton(chunk.doc_id, chunk as any);
+                              }
+                            }}
                           >
                             <FileIcon name={chunk.docnm_kwd}></FileIcon>
-                            {chunk.docnm_kwd}
+                            {chunk.source_type === 'local_scan' &&
+                            chunk.location
+                              ? chunk.location
+                              : chunk.docnm_kwd}
                           </div>
                         </div>
                         {index < chunks.length - 1 && (

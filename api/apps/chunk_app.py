@@ -478,8 +478,19 @@ async def retrieval_test():
                 ranks["chunks"].insert(0, ck)
         ranks["chunks"] = settings.retriever.retrieval_by_children(ranks["chunks"], tenant_ids)
 
+        chunk_doc_ids = [c.get("doc_id") for c in ranks["chunks"] if c.get("doc_id")]
+        doc_info_map = {}
+        if chunk_doc_ids:
+            docs = list(DocumentService.get_by_ids(chunk_doc_ids))
+            for doc in docs:
+                doc_info_map[doc.id] = {"source_type": doc.source_type, "location": doc.location}
+
         for c in ranks["chunks"]:
             c.pop("vector", None)
+            doc_id = c.get("doc_id")
+            if doc_id and doc_id in doc_info_map:
+                c["source_type"] = doc_info_map[doc_id]["source_type"]
+                c["location"] = doc_info_map[doc_id]["location"]
         ranks["labels"] = labels
 
         return get_json_result(data=ranks)
