@@ -90,8 +90,11 @@ def do_scan(kb_id, path, scan_interval=60):
 
     if not files_to_import:
         logging.info(f"No supported files found in: {path}")
-        ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
-        return
+        current_file_paths = set()
+    else:
+        current_file_paths = set()
+        for file_path, rel_path in files_to_import:
+            current_file_paths.add(file_path)
 
     existing_dirs = ScannedDirectoryService.get_by_kb_id(kb_id)
     scan_dir_id = None
@@ -113,10 +116,6 @@ def do_scan(kb_id, path, scan_interval=60):
 
     imported_docs = []
 
-    current_file_paths = set()
-    for file_path, rel_path in files_to_import:
-        current_file_paths.add(file_path)
-
     existing_docs = list(DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value))
     deleted_count = 0
     skipped_count = 0
@@ -137,9 +136,10 @@ def do_scan(kb_id, path, scan_interval=60):
             except:
                 pass
             try:
-                Document.delete_by_id(existing_doc.id)
-            except:
-                pass
+                tenant_id = DocumentService.get_tenant_id(existing_doc.id)
+                DocumentService.remove_document(existing_doc, tenant_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete document {existing_doc.id}: {e}")
             deleted_count += 1
             logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
         else:
@@ -161,9 +161,10 @@ def do_scan(kb_id, path, scan_interval=60):
                     except:
                         pass
                     try:
-                        Document.delete_by_id(existing_doc.id)
-                    except:
-                        pass
+                        tenant_id = DocumentService.get_tenant_id(existing_doc.id)
+                        DocumentService.remove_document(existing_doc, tenant_id)
+                    except Exception as e:
+                        logging.warning(f"Failed to delete document {existing_doc.id} for re-parsing: {e}")
             except OSError:
                 pass
 

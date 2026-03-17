@@ -1033,8 +1033,12 @@ def do_scan_path(kb_id, path, scan_interval=60):
 
     if not files_to_import:
         logging.info(f"No supported files found in: {path}")
-        ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
-        return
+        # Still process existing documents to detect deletions
+        current_file_paths = set()
+    else:
+        current_file_paths = set()
+        for file_path, rel_path in files_to_import:
+            current_file_paths.add(file_path)
 
     existing_dirs = ScannedDirectoryService.get_by_kb_id(kb_id)
     scan_dir_id = None
@@ -1153,6 +1157,8 @@ async def scan_path():
     Scan a local path and import all supported files to the knowledge base.
     Only stores file path + index vector, not the original file itself.
     """
+    import logging
+
     req = await get_request_json()
     kb_id = req.get("kb_id")
     path = req.get("path")
@@ -1216,14 +1222,48 @@ async def scan_path():
                 files_to_import.append((file_path, rel_path))
 
     if not files_to_import:
-        return get_json_result(data={"imported": [], "errors": [], "scan_dir_id": scan_dir_id}, message="No supported files found in the specified path.")
+        # Still process existing documents to detect deletions
+        current_file_paths = set()
+    else:
+        current_file_paths = set()
+        for file_path, rel_path in files_to_import:
+            current_file_paths.add(file_path)
 
+    # Process deletions and re-parsing before returning
     from api.db.services.document_service import DocumentService
+
+    existing_docs = list(DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value))
+    deleted_count = 0
+
+    for existing_doc in existing_docs:
+        doc_location = existing_doc.location
+        if not doc_location or not doc_location.startswith(path):
+            continue
+
+        if doc_location not in current_file_paths:
+            try:
+                File2DocumentService.delete_by_document_id(existing_doc.id)
+            except:
+                pass
+            try:
+                File.delete_by_id(existing_doc.id)
+            except:
+                pass
+            try:
+                tenant_id = DocumentService.get_tenant_id(existing_doc.id)
+                DocumentService.remove_document(existing_doc, tenant_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete document {existing_doc.id}: {e}")
+            deleted_count += 1
+            logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
+
+    ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
+
+    if not files_to_import:
+        return get_json_result(data={"imported": [], "deleted": deleted_count, "errors": [], "scan_dir_id": scan_dir_id}, message="No supported files found in the specified path.")
 
     imported_docs = []
     errors = []
-
-    import logging
 
     logging.info(f"Scan path: kb.id={kb.id}, kb_id={kb_id}, kb.name={kb.name}, user={current_user.id}, tenant_id={kb.tenant_id}")
 
@@ -1254,9 +1294,10 @@ async def scan_path():
             except:
                 pass
             try:
-                Document.delete_by_id(existing_doc.id)
-            except:
-                pass
+                tenant_id = DocumentService.get_tenant_id(existing_doc.id)
+                DocumentService.remove_document(existing_doc, tenant_id)
+            except Exception as e:
+                logging.warning(f"Failed to delete document {existing_doc.id}: {e}")
             deleted_count += 1
             logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
         else:
@@ -1278,9 +1319,10 @@ async def scan_path():
                     except:
                         pass
                     try:
-                        Document.delete_by_id(existing_doc.id)
-                    except:
-                        pass
+                        tenant_id = DocumentService.get_tenant_id(existing_doc.id)
+                        DocumentService.remove_document(existing_doc, tenant_id)
+                    except Exception as e:
+                        logging.warning(f"Failed to delete document {existing_doc.id} for re-parsing: {e}")
             except OSError:
                 pass
 
@@ -1488,7 +1530,8 @@ async def delete_scanned_directory(directory_id):
             except Exception as e:
                 logging.warning(f"Failed to delete File {doc_id}: {e}")
             try:
-                Document.delete_by_id(doc_id)
+                tenant_id = DocumentService.get_tenant_id(doc_id)
+                DocumentService.remove_document(doc, tenant_id)
             except Exception as e:
                 logging.warning(f"Failed to delete Document {doc_id}: {e}")
             deleted_docs += 1
