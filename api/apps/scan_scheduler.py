@@ -11,9 +11,17 @@ from datetime import datetime
 from uuid import uuid4
 from common.constants import FileSource
 
+_scheduler_started = False
+
 
 def start_scan_scheduler():
     """Start the background scheduler for scanned directories."""
+    global _scheduler_started
+    if _scheduler_started:
+        logging.info("Scan scheduler already started, skipping")
+        return
+    _scheduler_started = True
+
     logging.info("Starting scanned directory background scheduler")
 
     def scan_worker():
