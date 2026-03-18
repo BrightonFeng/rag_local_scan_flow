@@ -18,6 +18,7 @@ import logging
 import os.path
 import pathlib
 import re
+from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from quart import request, make_response
 from api.apps import current_user, login_required
@@ -1056,6 +1057,7 @@ def do_scan_path(kb_id, path, scan_interval=60):
             directory_path=path,
             scan_interval_minutes=scan_interval,
             created_by=kb.tenant_id,
+            created_at=datetime.now(),
         )
 
     imported_docs = []
@@ -1200,6 +1202,7 @@ async def scan_path():
             directory_path=path,
             scan_interval_minutes=scan_interval,
             created_by=current_user.id,
+            created_at=datetime.now(),
         )
         ScannedDirectoryService.update_last_scan_time(scan_dir_id)
 

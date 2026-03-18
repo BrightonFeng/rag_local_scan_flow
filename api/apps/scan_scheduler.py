@@ -112,6 +112,7 @@ def do_scan(kb_id, path, scan_interval=60):
             directory_path=path,
             scan_interval_minutes=scan_interval,
             created_by=kb.tenant_id,
+            created_at=datetime.now(),
         )
 
     imported_docs = []

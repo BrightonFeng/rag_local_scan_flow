@@ -789,7 +789,15 @@ class OllamaCV(Base):
                 if not ret:
                     break
                 if frame_count % interval == 0:
-                    _, buffer = cv2.imencode(".jpg", frame)
+                    h, w = frame.shape[:2]
+                    max_dim = 480
+                    if h > max_dim or w > max_dim:
+                        if h > w:
+                            new_h, new_w = max_dim, int(w * max_dim / h)
+                        else:
+                            new_h, new_w = int(h * max_dim / w), max_dim
+                        frame = cv2.resize(frame, (new_w, new_h))
+                    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
                     frames.append(base64.b64encode(buffer).decode("utf-8"))
                 frame_count += 1
                 if len(frames) >= 8:
