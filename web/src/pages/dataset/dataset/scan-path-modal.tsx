@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Alert, Form, Input, Select, Table, Tag } from 'antd';
+import { Alert, Form, Input, Modal, Select, Table, Tag } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -107,7 +107,16 @@ const ScanPathModal: React.FC<IProps> = ({
       render: (_: any, record: ScannedDirectory) => (
         <button
           type="button"
-          onClick={() => onDelete?.(record.id)}
+          onClick={() => {
+            Modal.confirm({
+              title: t('scanDirectory.confirmDeleteTitle'),
+              content: t('scanDirectory.confirmDelete'),
+              okText: t('scanDirectory.delete'),
+              cancelText: t('scanDirectory.cancel'),
+              okButtonProps: { danger: true },
+              onOk: () => onDelete?.(record.id),
+            });
+          }}
           className="text-red-500 hover:text-red-600 p-1 rounded"
           title={t('scanDirectory.delete')}
         >

@@ -2778,6 +2778,9 @@ Important structured information may include: names, dates, locations, events, k
       failedToDelete: 'Failed to delete',
       intervalUpdated: 'Scan interval updated',
       failedToUpdate: 'Failed to update',
+      confirmDelete:
+        'Are you sure you want to remove this directory from the scan list?',
+      confirmDeleteTitle: 'Confirm Delete',
     },
     sourceLocal: 'Local Upload',
     sourceLocalPath: 'Local Scan',

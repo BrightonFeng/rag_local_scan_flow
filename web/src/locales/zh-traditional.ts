@@ -1330,6 +1330,8 @@ export default {
       failedToDelete: '刪除失敗',
       intervalUpdated: '掃描間隔已更新',
       failedToUpdate: '更新失敗',
+      confirmDelete: '確定要從掃描列表中移除此目錄嗎？',
+      confirmDeleteTitle: '確認刪除',
     },
     sourceLocal: '本機上傳',
     sourceLocalPath: '本機掃描',
