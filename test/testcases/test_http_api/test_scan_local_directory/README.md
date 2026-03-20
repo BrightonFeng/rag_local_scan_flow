@@ -33,20 +33,18 @@ ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_dire
 |---|---|
 | RAGFlow API | `http://127.0.0.1:9380` |
 | Ollama 服务 | `http://localhost:11434`（需包含 `qwen3-vl:8b` 模型） |
-| 测试视频文件 | `/hdd1/test_scan/test1/*.mp4`（见下方说明） |
+| 测试视频文件 | `/hdd1/test_scan/*.mp4` |
 | ZHIPU_AI_API_KEY | 环境变量（可用 dummy 值绕过） |
 
 ### 测试视频文件
-测试使用 4 个视频文件，通过符号链接存放于 `/hdd1/test_scan/test1/`：
+测试使用 `/hdd1/test_scan/` 目录下的视频文件：
 
-```bash
-# 创建目录和符号链接（首次设置）
-mkdir -p /hdd1/test_scan/test1
-ln -sf "/hdd1/photo/20/澳大利亚/VID_20200126_091125.mp4" "/hdd1/test_scan/test1/091125.mp4"
-ln -sf "/hdd1/photo/20/澳大利亚/VID_20200126_100305.mp4" "/hdd1/test_scan/test1/100305.mp4"
-ln -sf "/hdd1/photo/20/澳大利亚/海狮1.mp4" "/hdd1/test_scan/test1/海狮1.mp4"
-ln -sf "/hdd1/video/自拍精选/2018/骑马.mp4" "/hdd1/test_scan/test1/骑马.mp4"
-```
+| 文件路径 | 内容描述 |
+|---|---|
+| `/hdd1/test_scan/091125.mp4` | 树袋熊（koala） |
+| `/hdd1/test_scan/100305.mp4` | 蜥蜴（lizard） |
+| `/hdd1/test_scan/海狮1.mp4` | 海狮（sea lion） |
+| `/hdd1/test_scan/骑马.mp4` | 骑马（horse） |
 
 ### Python 依赖
 | 包 | 说明 |
@@ -109,7 +107,7 @@ ln -sf "/hdd1/video/自拍精选/2018/骑马.mp4" "/hdd1/test_scan/test1/骑马.
 - **功能**: 创建知识库 → 扫描视频目录 → 等待解析完成 → 验证状态
 - **方法**:
   1. POST `/v1/kb/create` 创建临时 KB
-  2. POST `/v1/document/scan_path` 扫描 `/hdd1/test_scan/test1`（含 4 个视频）
+  2. POST `/v1/document/scan_path` 扫描 `/hdd1/test_scan`（含 4 个视频）
   3. 轮询（最多 120 秒）GET `/v1/document/list` 检查文档解析状态
   4. 清理：DELETE `/v1/kb/{kb_id}`
 - **预期**: 所有文档状态为 `success`，无 `failed` 状态

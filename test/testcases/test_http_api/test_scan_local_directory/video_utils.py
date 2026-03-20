@@ -15,10 +15,10 @@ sys.path.insert(0, "/ragflow")
 cv2 = None
 
 TEST_VIDEOS: List[Tuple[str, str]] = [
-    ("/hdd1/test_scan/test1/091125.mp4", "koala"),
-    ("/hdd1/test_scan/test1/100305.mp4", "lizard"),
-    ("/hdd1/test_scan/test1/海狮1.mp4", "sea lion"),
-    ("/hdd1/test_scan/test1/骑马.mp4", "horse"),
+    ("/hdd1/test_scan/091125.mp4", "koala"),
+    ("/hdd1/test_scan/100305.mp4", "lizard"),
+    ("/hdd1/test_scan/海狮1.mp4", "sea lion"),
+    ("/hdd1/test_scan/骑马.mp4", "horse"),
 ]
 
 MAX_DIM = 480

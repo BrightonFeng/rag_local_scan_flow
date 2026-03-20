@@ -39,7 +39,7 @@ class TestMp4Parsing:
         kb_id = kb_data["data"]["kb_id"]
         print(f"\n  KB: {kb_id}")
 
-        test_dir = "/hdd1/test_scan/test1"
+        test_dir = "/hdd1/test_scan"
         response = requests.post(f"{HOST}/{VERSION}/document/scan_path", headers=headers, json={"kb_id": kb_id, "path": test_dir, "scan_interval": 60}, timeout=30)
         scan_result = response.json()
         assert scan_result.get("code") == 0, f"Scan failed: {scan_result}"
