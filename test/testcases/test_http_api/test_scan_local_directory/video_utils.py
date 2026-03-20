@@ -10,9 +10,9 @@ import base64
 import sys
 from typing import List, Tuple
 
-cv2 = None
-
 sys.path.insert(0, "/ragflow")
+
+cv2 = None
 
 TEST_VIDEOS: List[Tuple[str, str]] = [
     ("/hdd1/test_scan/test1/091125.mp4", "koala"),

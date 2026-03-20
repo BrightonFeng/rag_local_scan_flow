@@ -29,6 +29,7 @@ API_RETRIEVAL_TEST_URL = f"{HOST}/{VERSION}/chunk/retrieval_test"
 API_LLM_URL = f"{HOST}/{VERSION}/llm"
 
 TEST_SCAN_DIR = "/hdd1/test_scan"
+TEST_VIDEOS_DIR = os.path.join(TEST_SCAN_DIR, "test1")
 OLLAMA_HOST = "http://localhost:11434"
 
 
@@ -91,6 +92,7 @@ def retrieval_test(auth, kb_id, question, page=1, size=10):
 
 def setup_module(module):
     os.makedirs(TEST_SCAN_DIR, exist_ok=True)
+    os.makedirs(TEST_VIDEOS_DIR, exist_ok=True)
 
 
 def teardown_module(module):

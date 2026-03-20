@@ -20,6 +20,11 @@ import time
 import pytest
 from video_utils import TEST_VIDEOS
 
+try:
+    from rag.app.picture import chunk
+except ImportError:
+    chunk = None
+
 
 TENANT_ID = "6f020496203111f1a9ee414ccff73856"
 
@@ -35,7 +40,8 @@ class TestVideoChunkParsing:
     @pytest.mark.parametrize("video_path,_desc", TEST_VIDEOS)
     def test_video_chunk(self, video_path, _desc):
         """Test that rag.app.picture.chunk successfully parses each video."""
-        from rag.app.picture import chunk
+        if chunk is None:
+            pytest.skip("rag.app.picture not importable (requires full RAGFlow backend)")
 
         filename = video_path.split("/")[-1]
         print(f"\n  Testing {filename}")
