@@ -95,4 +95,11 @@ def setup_module(module):
 
 def teardown_module(module):
     if os.path.exists(TEST_SCAN_DIR):
-        shutil.rmtree(TEST_SCAN_DIR)
+        for entry in os.listdir(TEST_SCAN_DIR):
+            if entry.endswith(".mp4"):
+                continue
+            path = os.path.join(TEST_SCAN_DIR, entry)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
