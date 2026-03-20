@@ -18,45 +18,9 @@ import os
 import time
 
 import pytest
-import requests
-from configs import HOST_ADDRESS, VERSION
-
-
-RETRIEVAL_TEST_API_URL = f"{HOST_ADDRESS}/{VERSION}/chunk/retrieval_test"
-DOCUMENT_API_URL = f"{HOST_ADDRESS}/{VERSION}/document"
-SCAN_PATH_API_URL = f"{HOST_ADDRESS}/{VERSION}/document/scan_path"
-SCANNED_DIRS_API_URL = f"{HOST_ADDRESS}/{VERSION}/document/scanned_directories"
 
 
 TEST_SCAN_DIR = "/hdd1/test_scan"
-
-
-def setup_module(module):
-    """Setup test directory."""
-    os.makedirs(TEST_SCAN_DIR, exist_ok=True)
-
-
-def scan_path(auth, kb_id, path, scan_interval=10080):
-    """Scan a local directory."""
-    headers = {"Authorization": str(auth)}
-    payload = {"kb_id": kb_id, "path": path, "scan_interval": scan_interval}
-    response = requests.post(SCAN_PATH_API_URL, headers=headers, json=payload)
-    return response.json()
-
-
-def list_documents(auth, kb_id):
-    """List documents in a knowledge base."""
-    headers = {"Authorization": str(auth)}
-    response = requests.get(DOCUMENT_API_URL, headers=headers, params={"kb_id": kb_id})
-    return response.json()
-
-
-def retrieval_test(auth, kb_id, question, page=1, size=10):
-    """Perform retrieval test."""
-    headers = {"Authorization": str(auth)}
-    payload = {"kb_id": kb_id, "question": question, "page": page, "size": size, "highlight": True}
-    response = requests.post(RETRIEVAL_TEST_API_URL, headers=headers, json=payload)
-    return response.json()
 
 
 @pytest.mark.p1
@@ -66,6 +30,8 @@ class TestDocumentDeletion:
 
     def test_delete_file_removes_document_and_chunks(self, HttpApiAuth, add_dataset):
         """Test that deleting a file from scanned directory removes document and its chunks."""
+        from conftest import scan_path, list_documents, retrieval_test
+
         test_subdir = os.path.join(TEST_SCAN_DIR, "delete_test1")
         os.makedirs(test_subdir, exist_ok=True)
 
@@ -78,12 +44,13 @@ class TestDocumentDeletion:
         time.sleep(15)
 
         docs = list_documents(HttpApiAuth, add_dataset)
-        doc_names = [d["name"] for d in docs.get("data", {}).get("docs", [])]
+        assert docs.get("code") == 0, f"list_documents failed: {docs}"
+        doc_names = [d["name"] for d in (docs.get("data") or {}).get("docs", [])]
         assert "delete_test.txt" in doc_names, "Document should be created"
 
         res = retrieval_test(HttpApiAuth, add_dataset, "KEYWORD123")
-        assert res["code"] == 0
-        chunks = res.get("data", {}).get("chunks", [])
+        assert res.get("code") == 0, f"retrieval_test failed: {res}"
+        chunks = (res.get("data") or {}).get("chunks", [])
         assert len(chunks) > 0, "Chunks should exist after initial scan"
 
         os.remove(test_file)
@@ -91,11 +58,14 @@ class TestDocumentDeletion:
         time.sleep(15)
 
         docs = list_documents(HttpApiAuth, add_dataset)
-        doc_names = [d["name"] for d in docs.get("data", {}).get("docs", [])]
+        assert docs.get("code") == 0, f"list_documents failed: {docs}"
+        doc_names = [d["name"] for d in (docs.get("data") or {}).get("docs", [])]
         assert "delete_test.txt" not in doc_names, "Document should be deleted after file removal"
 
     def test_modify_file_reparses_document(self, HttpApiAuth, add_dataset):
         """Test that modifying a file triggers re-parsing and index update."""
+        from conftest import scan_path, retrieval_test
+
         test_subdir = os.path.join(TEST_SCAN_DIR, "delete_test2")
         os.makedirs(test_subdir, exist_ok=True)
 
@@ -108,8 +78,8 @@ class TestDocumentDeletion:
         time.sleep(15)
 
         res = retrieval_test(HttpApiAuth, add_dataset, "KEYWORD456")
-        assert res["code"] == 0
-        chunks = res.get("data", {}).get("chunks", [])
+        assert res.get("code") == 0, f"retrieval_test failed: {res}"
+        chunks = (res.get("data") or {}).get("chunks", [])
         assert len(chunks) > 0, "Chunks should exist after initial scan"
 
         time.sleep(2)
@@ -119,11 +89,9 @@ class TestDocumentDeletion:
 
         time.sleep(15)
 
-        res_old = retrieval_test(HttpApiAuth, add_dataset, "KEYWORD456")
-        chunks_old = res_old.get("data", {}).get("chunks", [])
-
         res_new = retrieval_test(HttpApiAuth, add_dataset, "NEWKEYWORD789")
-        chunks_new = res_new.get("data", {}).get("chunks", [])
+        assert res_new.get("code") == 0, f"retrieval_test failed: {res_new}"
+        chunks_new = (res_new.get("data") or {}).get("chunks", [])
 
         assert len(chunks_new) > 0, "New chunks should exist after re-parsing"
         assert chunks_new[0]["content_with_weight"].find("Modified content") >= 0, "Content should be updated"

@@ -1,59 +1,60 @@
-import requests
-import time
+#!/usr/bin/env python3
+#
+#  Copyright 2025 The InfiniFlow Authors. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+
 import json
+import time
 
-HOST = "http://127.0.0.1:9380"
-VERSION = "v1"
+import pytest
+import requests
+from configs import HOST_ADDRESS, VERSION
 
-
-def login():
-    password = """ctAseGvejiaSWWZ88T/m4FQVOpQyUvP+x7sXtdv3feqZACiQleuewkUi35E16wSd5C5QcnkkcV9cYc8TKPTRZlxappDuirxghxoOvFcJxFU4ixLsD
-fN33jCHRoDUW81IH9zjij/vaw8IbVyb6vuwg6MX6inOEBRRzVbRYxXOu1wkWY6SsI8X70oF9aeLFp/PzQpjoe/YbSqpTq8qqrmHzn9vO+yvyYyvmDsphXe
-X8f7fp9c7vUsfOCkM+gHY3PadG+QHa7KI7mzTKgUTZImK6BZtfRBATDTthEUbbaTewY4H0MnWiCeeDhcbeQao6cFy1To8pE3RpmxnGnS8BsBn8w=="""
-    response = requests.post(f"{HOST}/{VERSION}/user/login", json={"email": "qa@infiniflow.org", "password": password}, timeout=30)
-    return response.headers.get("Authorization")
+HOST = HOST_ADDRESS
 
 
-token = login()
-headers = {"Authorization": str(token)}
+@pytest.mark.p1
+class TestMp4Parsing:
+    """End-to-end test: create KB, scan video directory, verify parsing."""
 
-# Create KB
-print("Creating KB...")
-response = requests.post(f"{HOST}/{VERSION}/kb/create", headers=headers, json={"name": f"test_mp4_{int(time.time())}"}, timeout=30)
-kb_data = response.json()
-if kb_data.get("code") != 0:
-    print(f"Failed to create KB: {kb_data}")
-    exit(1)
-kb_id = kb_data["data"]["kb_id"]
-print(f"Created KB: {kb_id}")
+    def test_scan_video_directory_and_wait(self, scan_auth):
+        """Create KB, scan video directory, wait for parsing to complete."""
+        headers = {"Authorization": str(scan_auth)}
 
-# Scan directory
-test_dir = "/hdd1/test_scan/test1"
-print(f"\nScanning {test_dir}...")
-response = requests.post(f"{HOST}/{VERSION}/document/scan_path", headers=headers, json={"kb_id": kb_id, "path": test_dir, "scan_interval": 60}, timeout=30)
-scan_result = response.json()
-print(f"Scan result: {scan_result}")
+        response = requests.post(f"{HOST}/{VERSION}/kb/create", headers=headers, json={"name": f"test_mp4_{int(time.time())}"}, timeout=30)
+        kb_data = response.json()
+        assert kb_data.get("code") == 0, f"Failed to create KB: {kb_data}"
+        kb_id = kb_data["data"]["kb_id"]
+        print(f"\n  KB: {kb_id}")
 
-if scan_result.get("code") != 0:
-    print("Scan failed!")
-    exit(1)
+        test_dir = "/hdd1/test_scan/test1"
+        response = requests.post(f"{HOST}/{VERSION}/document/scan_path", headers=headers, json={"kb_id": kb_id, "path": test_dir, "scan_interval": 60}, timeout=30)
+        scan_result = response.json()
+        assert scan_result.get("code") == 0, f"Scan failed: {scan_result}"
+        print(f"  Scan initiated for {test_dir}")
 
-# Wait and check parsing status
-print("\nWaiting for parsing...")
-for i in range(12):  # 2 minutes
-    time.sleep(10)
-    response = requests.post(f"{HOST}/{VERSION}/document/list", headers=headers, params={"kb_id": kb_id}, timeout=30)
-    docs = response.json()
+        for i in range(12):
+            time.sleep(10)
+            response = requests.post(f"{HOST}/{VERSION}/document/list", headers=headers, params={"kb_id": kb_id}, timeout=30)
+            docs = response.json()
+            if docs.get("code") == 0 and docs.get("data"):
+                for doc in docs["data"].get("docs", []):
+                    status = doc.get("status")
+                    chunk_num = doc.get("chunk_num")
+                    name = doc.get("name")
+                    print(f"  [{i * 10}s] {name}: status={status}, chunks={chunk_num}")
+                    assert status != "failed", f"Document {name} failed. Detail: {requests.get(f'{HOST}/{VERSION}/document/get/{doc["id"]}', headers=headers, timeout=30).json()}"
 
-    if docs.get("code") == 0 and docs.get("data"):
-        for doc in docs["data"].get("docs", []):
-            status = doc.get("status")
-            chunk_num = doc.get("chunk_num")
-            name = doc.get("name")
-            print(f"  [{i * 10}s] {name}: status={status}, chunks={chunk_num}")
-
-            if status == "failed":
-                print(f"  FAILED! Checking details...")
-                response = requests.get(f"{HOST}/{VERSION}/document/get/{doc['id']}", headers=headers, timeout=30)
-                detail = response.json()
-                print(f"  Detail: {json.dumps(detail, indent=2, ensure_ascii=False)[:500]}")
+        requests.delete(f"{HOST}/{VERSION}/kb/{kb_id}", headers=headers, timeout=30)

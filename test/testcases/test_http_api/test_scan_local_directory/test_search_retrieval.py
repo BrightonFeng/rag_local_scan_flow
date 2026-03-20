@@ -18,37 +18,9 @@ import os
 import time
 
 import pytest
-import requests
-from configs import HOST_ADDRESS, VERSION
-
-
-RETRIEVAL_TEST_API_URL = f"{HOST_ADDRESS}/{VERSION}/chunk/retrieval_test"
-DOCUMENT_API_URL = f"{HOST_ADDRESS}/{VERSION}/document"
-SCAN_PATH_API_URL = f"{HOST_ADDRESS}/{VERSION}/document/scan_path"
 
 
 TEST_SCAN_DIR = "/hdd1/test_scan"
-
-
-def setup_module(module):
-    """Setup test directory."""
-    os.makedirs(TEST_SCAN_DIR, exist_ok=True)
-
-
-def scan_path(auth, kb_id, path, scan_interval=10080):
-    """Scan a local directory."""
-    headers = {"Authorization": str(auth)}
-    payload = {"kb_id": kb_id, "path": path, "scan_interval": scan_interval}
-    response = requests.post(SCAN_PATH_API_URL, headers=headers, json=payload)
-    return response.json()
-
-
-def retrieval_test(auth, kb_id, question, page=1, size=10):
-    """Perform retrieval test."""
-    headers = {"Authorization": str(auth)}
-    payload = {"kb_id": kb_id, "question": question, "page": page, "size": size, "highlight": True}
-    response = requests.post(RETRIEVAL_TEST_API_URL, headers=headers, json=payload)
-    return response.json()
 
 
 @pytest.mark.p1
@@ -58,6 +30,8 @@ class TestSearchRetrievalLocalScan:
 
     def test_retrieval_returns_source_type_and_location(self, HttpApiAuth, add_dataset):
         """Test that retrieval returns source_type and location for local_scan files."""
+        from conftest import scan_path, retrieval_test
+
         test_subdir = os.path.join(TEST_SCAN_DIR, "retrieval_test1")
         os.makedirs(test_subdir, exist_ok=True)
 
@@ -71,10 +45,10 @@ class TestSearchRetrievalLocalScan:
 
         res = retrieval_test(HttpApiAuth, add_dataset, "TESTKEY123")
 
-        assert res["code"] == 0, f"Retrieval failed: {res.get('message')}"
+        assert res.get("code") == 0, f"Retrieval failed: {res}"
 
-        chunks = res.get("data", {}).get("chunks", [])
-        assert len(chunks) > 0, "No chunks returned"
+        chunks = (res.get("data") or {}).get("chunks", [])
+        assert len(chunks) > 0, f"No chunks returned, response: {res}"
 
         chunk = chunks[0]
 
@@ -87,6 +61,8 @@ class TestSearchRetrievalLocalScan:
 
     def test_retrieval_full_path_display(self, HttpApiAuth, add_dataset):
         """Test that full path is returned for local_scan files."""
+        from conftest import scan_path, retrieval_test
+
         test_subdir = os.path.join(TEST_SCAN_DIR, "retrieval_test2")
         os.makedirs(test_subdir, exist_ok=True)
 
@@ -100,10 +76,10 @@ class TestSearchRetrievalLocalScan:
 
         res = retrieval_test(HttpApiAuth, add_dataset, "FULLPATH456")
 
-        assert res["code"] == 0, f"Retrieval failed: {res.get('message')}"
+        assert res.get("code") == 0, f"Retrieval failed: {res}"
 
-        chunks = res.get("data", {}).get("chunks", [])
-        assert len(chunks) > 0, "No chunks returned"
+        chunks = (res.get("data") or {}).get("chunks", [])
+        assert len(chunks) > 0, f"No chunks returned, response: {res}"
 
         chunk = chunks[0]
 
