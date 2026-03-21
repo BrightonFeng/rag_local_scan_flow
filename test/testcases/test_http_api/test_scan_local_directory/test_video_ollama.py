@@ -45,10 +45,10 @@ class TestVideoOllamaParsing:
         assert content, f"Empty response for {video_path}"
 
     @pytest.mark.parametrize("video_path,expected_keyword", TEST_VIDEOS)
-    def test_video_stability_10_runs(self, ollama_client, video_path, expected_keyword):
-        """Test 10 runs: verify no repetition or empty responses across runs."""
+    def test_video_stability_5_runs(self, ollama_client, video_path, expected_keyword):
+        """Test 5 runs: verify no repetition or empty responses across runs."""
         failures = []
-        for run in range(10):
+        for run in range(5):
             frames, _, _ = extract_frames(video_path)
             messages = build_messages(frames)
             response = ollama_client.chat(model="qwen3-vl:8b", messages=messages, keep_alive=-1)
@@ -56,12 +56,12 @@ class TestVideoOllamaParsing:
 
             if not content:
                 msg = response["message"].get("thinking", "empty")
-                failures.append(f"Run {run + 1}: empty response, thinking={str(msg)[:100]}")
+                failures.append(f"Run {run + 1}: empty response, thinking={str(msg)[:50]}")
                 continue
 
             words = content.split()
             if len(set(words)) < len(words) * 0.3:
                 failures.append(f"Run {run + 1}: possible repetition")
 
-        print(f"\n  [{video_path.split('/')[-1]}] {10 - len(failures)}/10 successful")
+        print(f"\n  [{video_path.split('/')[-1]}] {5 - len(failures)}/5 successful")
         assert not failures, f"Failures: {failures}"

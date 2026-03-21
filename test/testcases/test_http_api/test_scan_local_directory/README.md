@@ -16,14 +16,14 @@ test/testcases/test_http_api/test_scan_local_directory/
 ## 快速运行
 
 ```bash
-# 运行所有测试（需设置 ZHIPU_AI_API_KEY）
-ZHIPU_AI_API_KEY=dummy pytest test/testcases/test_http_api/test_scan_local_directory/ -v
+# 运行所有测试
+pytest test/testcases/test_http_api/test_scan_local_directory/ -v
 
 # 运行指定测试文件
-ZHIPU_AI_API_KEY=dummy pytest test/testcases/test_http_api/test_scan_local_directory/test_ollama_setup.py -v
+pytest test/testcases/test_http_api/test_scan_local_directory/test_ollama_setup.py -v
 
 # 运行单个测试
-ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_directory/test_video_ollama.py::TestVideoOllamaParsing::test_single_video_parse" -v
+pytest "test/testcases/test_http_api/test_scan_local_directory/test_video_ollama.py::TestVideoOllamaParsing::test_video_stability_5_runs" -v
 ```
 
 ## 依赖条件
@@ -34,7 +34,7 @@ ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_dire
 | RAGFlow API | `http://127.0.0.1:9380` |
 | Ollama 服务 | `http://localhost:11434`（需包含 `qwen3-vl:8b` 模型） |
 | 测试视频文件 | `/hdd1/test_scan/*.mp4` |
-| ZHIPU_AI_API_KEY | 环境变量（可用 dummy 值绕过） |
+| LLM Provider | Ollama（本地部署） |
 
 ### 测试视频文件
 测试使用 `/hdd1/test_scan/` 目录下的视频文件：
@@ -137,12 +137,12 @@ ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_dire
 - **依赖**: `ollama_client` fixture；`qwen3-vl:8b` 模型
 - **运行时间**: ~15 秒/视频
 
-#### `test_video_stability_10_runs`（参数化 × 4 视频）
-- **功能**: 稳定性测试：同一视频跑 10 次，验证无空响应或重复输出
-- **方法**: 对每个视频重复 10 次 `test_single_video_parse` 逻辑
-- **预期**: 10 次全部成功，无空响应，无明显重复（唯一词比例 > 30%）
+#### `test_video_stability_5_runs`（参数化 × 4 视频）
+- **功能**: 稳定性测试：同一视频跑 5 次，验证无空响应或重复输出
+- **方法**: 对每个视频重复 5 次 `test_single_video_parse` 逻辑
+- **预期**: 5 次全部成功，无空响应，无明显重复（唯一词比例 > 30%）
 - **依赖**: 同 `test_single_video_parse`
-- **运行时间**: ~135 秒/视频（10 × ~13.5 秒）
+- **运行时间**: ~65 秒/视频（5 × ~13 秒）
 
 ---
 
@@ -160,11 +160,10 @@ ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_dire
 - **注意**: 此测试需要完整的 RAGFlow 后端环境，在宿主机直接运行会因 `rag.common` vs `testcases.common` 命名空间冲突而失败。**建议在 Docker 容器内运行**：
   ```bash
   # 在 Docker 内运行（需 PYTHONPATH 设置正确）
-  docker exec -e PYTHONPATH=/ragflow:/tmp/testcases \
-             -e ZHIPU_AI_API_KEY=dummy \
-             docker-ragflow-cpu-1 \
-             /ragflow/.venv/bin/python3 -m pytest \
-             /tmp/testcases/test_http_api/test_scan_local_directory/test_video_chunk.py -v
+   docker exec -e PYTHONPATH=/ragflow:/tmp/testcases \
+              docker-ragflow-cpu-1 \
+              /ragflow/.venv/bin/python3 -m pytest \
+              /tmp/testcases/test_http_api/test_scan_local_directory/test_video_chunk.py -v
   ```
 
 ---
@@ -202,6 +201,5 @@ ZHIPU_AI_API_KEY=dummy pytest "test/testcases/test_http_api/test_scan_local_dire
 ## 已知限制
 
 1. **test_video_chunk** 在宿主机上无法运行（命名空间冲突）。需要完整 RAGFlow 后端环境。
-2. **稳定性测试**（10 次）耗时较长（约 135 秒/视频），CI 环境中可酌情跳过。
-3. 测试视频文件通过符号链接存放，首次使用需手动创建链接。
-4. 某些测试需要有效的 KB（由 `add_dataset` fixture 提供），当前 tenant 环境隔离问题可能导致部分依赖 KB 的测试失败。
+2. **稳定性测试**（5 次）耗时约 65 秒/视频，CI 环境中可酌情跳过。
+3. 某些测试需要有效的 KB（由 `add_dataset` fixture 提供），当前 tenant 环境隔离问题可能导致部分依赖 KB 的测试失败。

@@ -29,9 +29,28 @@ class TestScanLocalDirectory:
         )
         assert res.json()["code"] != 0
 
-    def test_scan_path_invalid_path(self, HttpApiAuth, add_dataset):
+    def test_scan_path_invalid_path(self, scan_auth):
         """Test scanning with invalid path should fail."""
+        import requests
+        from configs import HOST_ADDRESS, VERSION
+
+        kb_resp = requests.post(
+            f"{HOST_ADDRESS}/{VERSION}/kb/create",
+            headers={"Authorization": scan_auth},
+            json={"name": "temp-kb-invalid-path"},
+            timeout=30,
+        )
+        kb_data = kb_resp.json()
+        assert kb_data.get("code") == 0, f"Failed to create KB: {kb_data}"
+        kb_id = kb_data["data"]["kb_id"]
+
         from conftest import scan_path
 
-        res = scan_path(HttpApiAuth, add_dataset, "/nonexistent/path/12345")
+        res = scan_path(scan_auth, kb_id, "/nonexistent/path/12345")
         assert res["code"] != 0
+
+        requests.delete(
+            f"{HOST_ADDRESS}/{VERSION}/kb/{kb_id}",
+            headers={"Authorization": scan_auth},
+            timeout=30,
+        )

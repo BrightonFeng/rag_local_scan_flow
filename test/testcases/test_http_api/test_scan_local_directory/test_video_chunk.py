@@ -20,6 +20,10 @@ import time
 import pytest
 from video_utils import TEST_VIDEOS
 
+from common import settings
+
+settings.init_settings()
+
 try:
     from rag.app.picture import chunk
 except ImportError:
@@ -38,7 +42,7 @@ class TestVideoChunkParsing:
     """Test video parsing through rag.app.picture.chunk."""
 
     @pytest.mark.parametrize("video_path,_desc", TEST_VIDEOS)
-    def test_video_chunk(self, video_path, _desc):
+    def test_video_chunk(self, configure_ollama_img2txt, video_path, _desc):
         """Test that rag.app.picture.chunk successfully parses each video."""
         if chunk is None:
             pytest.skip("rag.app.picture not importable (requires full RAGFlow backend)")
