@@ -89,14 +89,20 @@ def do_scan(kb_id, path, scan_interval=60):
     )
 
     MAX_SCAN_FILE_COUNT = 10000
+    file_count = 0
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if re.match(supported_extensions, file, re.IGNORECASE):
+                file_count += 1
+                if file_count > MAX_SCAN_FILE_COUNT:
+                    logging.warning(f"Directory {path} has over {MAX_SCAN_FILE_COUNT} files, skipped.")
+                    return
+
     files_to_import = []
     for root, dirs, files in os.walk(path):
         for file in files:
             if re.match(supported_extensions, file, re.IGNORECASE):
                 files_to_import.append((os.path.join(root, file), os.path.relpath(os.path.join(root, file), path)))
-                if len(files_to_import) > MAX_SCAN_FILE_COUNT:
-                    logging.warning(f"Directory {path} has over {MAX_SCAN_FILE_COUNT} files, skipped.")
-                    return
 
     if not files_to_import:
         logging.info(f"No supported files found in: {path}")
