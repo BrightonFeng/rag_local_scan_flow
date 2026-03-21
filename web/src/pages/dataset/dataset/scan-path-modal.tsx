@@ -4,7 +4,6 @@ import { ButtonLoading } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -45,6 +44,13 @@ const ScanPathModal: React.FC<IProps> = ({
   const { t } = useTranslation();
   const [form] = Form.useForm();
 
+  const sortedDirectories = [...directories].sort((a, b) => {
+    if (!a.last_scan_time && !b.last_scan_time) return 0;
+    if (!a.last_scan_time) return 1;
+    if (!b.last_scan_time) return -1;
+    return a.last_scan_time.localeCompare(b.last_scan_time);
+  });
+
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
@@ -66,21 +72,21 @@ const ScanPathModal: React.FC<IProps> = ({
       dataIndex: 'directory_path',
       key: 'directory_path',
       ellipsis: true,
+      width: '60%',
     },
     {
       title: t('scanDirectory.lastScan'),
       dataIndex: 'last_scan_time',
       key: 'last_scan_time',
+      width: '25%',
       render: (time: string | null) =>
-        time
-          ? dayjs(time).format('YYYY-MM-DD HH:mm:ss')
-          : t('scanDirectory.never'),
+        time ? dayjs(time).format('YY-MM-DD HH:mm') : t('scanDirectory.never'),
     },
     {
       title: t('scanDirectory.interval'),
       dataIndex: 'scan_interval_minutes',
       key: 'scan_interval_minutes',
-      width: 100,
+      width: '15%',
       render: (interval: number, record: ScannedDirectory) => (
         <Select
           value={interval}
@@ -110,7 +116,7 @@ const ScanPathModal: React.FC<IProps> = ({
           onClick={() => {
             Modal.confirm({
               title: t('scanDirectory.confirmDeleteTitle'),
-              content: t('scanDirectory.confirmDelete'),
+              content: record.directory_path,
               okText: t('scanDirectory.delete'),
               cancelText: t('scanDirectory.cancel'),
               okButtonProps: { danger: true },
@@ -128,79 +134,97 @@ const ScanPathModal: React.FC<IProps> = ({
 
   return (
     <Dialog open={visible} onOpenChange={handleCancel}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-[1080px] sm:max-h-[80vh] overflow-hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{t('scanDirectory.title')}</DialogTitle>
         </DialogHeader>
 
-        {directories.length > 0 && (
-          <div className="mb-4">
+        <div className="flex gap-6 h-[440px]">
+          <div className="w-80 flex-shrink-0">
+            <Alert
+              message={t('scanDirectory.note')}
+              type="info"
+              showIcon
+              className="mb-4"
+            />
+            <Form
+              form={form}
+              name="scan_path"
+              layout="vertical"
+              autoComplete="off"
+            >
+              <Form.Item
+                label={t('scanDirectory.directoryPath')}
+                name="path"
+                rules={[
+                  {
+                    required: true,
+                    message: t('scanDirectory.pathPlaceholder'),
+                  },
+                ]}
+              >
+                <Input placeholder={t('scanDirectory.pathPlaceholder')} />
+              </Form.Item>
+
+              <Form.Item
+                label={t('scanDirectory.scanInterval')}
+                name="scan_interval"
+                initialValue={40320}
+              >
+                <Select
+                  style={{ width: '100%' }}
+                  getPopupContainer={(trigger) => trigger.parentElement!}
+                  options={[
+                    { label: t('scanDirectory.every10Minutes'), value: 10 },
+                    { label: t('scanDirectory.every30Minutes'), value: 30 },
+                    { label: t('scanDirectory.every1Hour'), value: 60 },
+                    { label: t('scanDirectory.every3Hours'), value: 180 },
+                    { label: t('scanDirectory.everyDay'), value: 1440 },
+                    { label: t('scanDirectory.everyWeek'), value: 10080 },
+                    { label: t('scanDirectory.every4Weeks'), value: 40320 },
+                  ]}
+                />
+              </Form.Item>
+
+              <Form.Item className="mb-0">
+                <div className="flex gap-2">
+                  <ButtonLoading loading={parentLoading} onClick={handleOk}>
+                    {t('scanDirectory.scan')}
+                  </ButtonLoading>
+                  <ButtonLoading variant="outline" onClick={handleCancel}>
+                    {t('scanDirectory.cancel')}
+                  </ButtonLoading>
+                </div>
+              </Form.Item>
+            </Form>
+          </div>
+
+          <div className="flex-1 min-w-0 h-[400px]">
             <div className="flex items-center justify-between mb-2">
               <span className="font-medium text-sm">
                 {t('scanDirectory.previouslyScanned')}
               </span>
               <Tag color="blue">{directories.length}</Tag>
             </div>
-            <Table
-              columns={columns}
-              dataSource={directories}
-              rowKey="id"
-              size="small"
-              pagination={false}
-              locale={{
-                emptyText: t('scanDirectory.noDirectoriesScanned'),
-              }}
-            />
+            <div className="h-[calc(100%-28px)] overflow-hidden border rounded">
+              <Table
+                columns={columns}
+                dataSource={sortedDirectories}
+                rowKey="id"
+                size="small"
+                pagination={false}
+                scroll={{ y: 320 }}
+                locale={{
+                  emptyText: t('scanDirectory.noDirectoriesScanned'),
+                }}
+              />
+            </div>
           </div>
-        )}
-
-        <Alert
-          message={t('scanDirectory.note')}
-          type="info"
-          showIcon
-          className="mb-4"
-        />
-
-        <Form form={form} name="scan_path" layout="vertical" autoComplete="off">
-          <Form.Item
-            label={t('scanDirectory.directoryPath')}
-            name="path"
-            rules={[
-              { required: true, message: t('scanDirectory.pathPlaceholder') },
-            ]}
-          >
-            <Input placeholder={t('scanDirectory.pathPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item
-            label={t('scanDirectory.scanInterval')}
-            name="scan_interval"
-            initialValue={40320}
-          >
-            <Select
-              style={{ width: '100%' }}
-              getPopupContainer={(trigger) => trigger.parentElement!}
-              options={[
-                { label: t('scanDirectory.every10Minutes'), value: 10 },
-                { label: t('scanDirectory.every30Minutes'), value: 30 },
-                { label: t('scanDirectory.every1Hour'), value: 60 },
-                { label: t('scanDirectory.every3Hours'), value: 180 },
-                { label: t('scanDirectory.everyDay'), value: 1440 },
-                { label: t('scanDirectory.everyWeek'), value: 10080 },
-                { label: t('scanDirectory.every4Weeks'), value: 40320 },
-              ]}
-            />
-          </Form.Item>
-        </Form>
-
-        <DialogFooter>
-          <ButtonLoading variant="outline" onClick={handleCancel}>
-            {t('scanDirectory.cancel')}
-          </ButtonLoading>
-          <ButtonLoading loading={parentLoading} onClick={handleOk}>
-            {t('scanDirectory.scan')}
-          </ButtonLoading>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

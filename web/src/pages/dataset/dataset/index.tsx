@@ -20,7 +20,7 @@ import {
   useFetchKnowledgeBaseConfiguration,
   useKnowledgeBaseId,
 } from '@/hooks/use-knowledge-request';
-import { LucidePlus, Upload } from 'lucide-react';
+import { FolderSearch, Upload } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MetadataType } from '../components/metedata/constant';
@@ -213,8 +213,8 @@ export default function Dataset() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="default">
-                <LucidePlus />
-                {t('knowledgeDetails.addFile')}
+                <Upload />
+                {t('fileManager.uploadFile')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-auto min-w-40" align="end">
@@ -228,7 +228,7 @@ export default function Dataset() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="default" onClick={() => showScanPathModal()}>
-            <Upload />
+            <FolderSearch />
             {t('scanDirectory.title')}
           </Button>
         </ListFilterBar>
