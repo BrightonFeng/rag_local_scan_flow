@@ -1068,16 +1068,10 @@ def do_scan_path(kb_id, path, scan_interval=60):
                 for existing_doc in existing_docs:
                     try:
                         File2DocumentService.delete_by_document_id(existing_doc.id)
-                    except:
-                        pass
-                    try:
                         File.delete_by_id(existing_doc.id)
-                    except:
-                        pass
-                    try:
                         Document.delete_by_id(existing_doc.id)
-                    except:
-                        pass
+                    except Exception as e:
+                        logging.warning(f"Failed to clean up old document {existing_doc.id}: {e}")
 
             filename = os.path.basename(file_path)
             doc_id = uuid4().hex
@@ -1159,8 +1153,6 @@ async def scan_path():
     Scan a local path and import all supported files to the knowledge base.
     Only stores file path + index vector, not the original file itself.
     """
-    import logging
-
     req = await get_request_json()
     kb_id = req.get("kb_id")
     path = req.get("path")
@@ -1183,260 +1175,14 @@ async def scan_path():
     if not check_kb_team_permission(kb, current_user.id):
         return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
-    supported_extensions = (
-        r".*\.pdf$|"
-        r".*\.(msg|eml|doc|docx|ppt|pptx|yml|xml|htm|json|jsonl|ldjson|csv|txt|ini|xls|xlsx|wps|rtf|hlp|pages|numbers|key|md|py|js|java|c|cpp|h|php|go|ts|sh|cs|kt|html|sql)$|"
-        r".*\.(wav|flac|ape|alac|wv|mp3|aac|ogg|vorbis|opus)$|"
-        r".*\.(jpg|jpeg|png|tif|gif|pcx|tga|exif|fpx|svg|psd|cdr|pcd|dxf|ufo|eps|ai|raw|webp|avif|apng|icon|ico|mpg|mpeg|avi|rm|rmvb|mov|wmv|asf|dat|asx|wvx|mpe|mpa|mp4|avi|mkv)$"
-    )
-
-    MAX_SCAN_FILE_COUNT = 10000
-    file_count = 0
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            if re.match(supported_extensions, file, re.IGNORECASE):
-                file_count += 1
-                if file_count > MAX_SCAN_FILE_COUNT:
-                    return get_json_result(
-                        data=False,
-                        message=f"所选目录包含超过 {MAX_SCAN_FILE_COUNT} 个文件。请将目录拆分为多个子目录后逐个添加。",
-                        code=RetCode.ARGUMENT_ERROR,
-                    )
-
     from api.db.services.scanned_directory_service import ScannedDirectoryService
 
-    existing_dirs = ScannedDirectoryService.get_by_kb_id(kb_id)
-    for existing_dir in existing_dirs:
-        if existing_dir.directory_path == path:
-            ScannedDirectoryService.update_last_scan_time(existing_dir.id)
-            scan_dir_id = existing_dir.id
-            break
-    else:
-        from uuid import uuid4
+    success, data, error = ScannedDirectoryService.scan_directory(kb_id, path, scan_interval, created_by=current_user.id)
 
-        new_id = uuid4().hex
-        scan_dir_id = new_id
-        ScannedDirectoryService.insert(
-            id=new_id,
-            kb_id=kb_id,
-            directory_path=path,
-            scan_interval_minutes=scan_interval,
-            created_by=current_user.id,
-            created_at=datetime.now(),
-        )
-        ScannedDirectoryService.update_last_scan_time(scan_dir_id)
+    if not success:
+        return get_json_result(data=False, message=error, code=RetCode.ARGUMENT_ERROR)
 
-    supported_extensions = (
-        r".*\.pdf$|"
-        r".*\.(msg|eml|doc|docx|ppt|pptx|yml|xml|htm|json|jsonl|ldjson|csv|txt|ini|xls|xlsx|wps|rtf|hlp|pages|numbers|key|md|py|js|java|c|cpp|h|php|go|ts|sh|cs|kt|html|sql)$|"
-        r".*\.(wav|flac|ape|alac|wv|mp3|aac|ogg|vorbis|opus)$|"
-        r".*\.(jpg|jpeg|png|tif|gif|pcx|tga|exif|fpx|svg|psd|cdr|pcd|dxf|ufo|eps|ai|raw|webp|avif|apng|icon|ico|mpg|mpeg|avi|rm|rmvb|mov|wmv|asf|dat|asx|wvx|mpe|mpa|mp4|avi|mkv)$"
-    )
-
-    files_to_import = []
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            if re.match(supported_extensions, file, re.IGNORECASE):
-                files_to_import.append((os.path.join(root, file), os.path.relpath(os.path.join(root, file), path)))
-
-    imported_docs = []
-    errors = []
-
-    if not files_to_import:
-        # Still process existing documents to detect deletions
-        current_file_paths = set()
-    else:
-        current_file_paths = set()
-        for file_path, rel_path in files_to_import:
-            current_file_paths.add(file_path)
-
-    # Process deletions and re-parsing before returning
-    from api.db.services.document_service import DocumentService
-
-    existing_docs = list(DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value))
-    deleted_count = 0
-
-    for existing_doc in existing_docs:
-        doc_location = existing_doc.location
-        if not doc_location or not doc_location.startswith(path):
-            continue
-
-        if doc_location not in current_file_paths:
-            try:
-                File2DocumentService.delete_by_document_id(existing_doc.id)
-            except:
-                pass
-            try:
-                File.delete_by_id(existing_doc.id)
-            except:
-                pass
-            try:
-                tenant_id = DocumentService.get_tenant_id(existing_doc.id)
-                DocumentService.remove_document(existing_doc, tenant_id)
-            except Exception as e:
-                logging.warning(f"Failed to delete document {existing_doc.id}: {e}")
-            deleted_count += 1
-            logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
-
-    ScannedDirectoryService.update_last_scan_time_by_path(kb_id, path)
-
-    if not files_to_import:
-        return get_json_result(data={"imported": [], "deleted": deleted_count, "errors": [], "scan_dir_id": scan_dir_id}, message="No supported files found in the specified path.")
-
-    imported_docs = []
-    errors = []
-
-    logging.info(f"Scan path: kb.id={kb.id}, kb_id={kb_id}, kb.name={kb.name}, user={current_user.id}, tenant_id={kb.tenant_id}")
-
-    from api.db.services.file_service import FileService
-    from api.db.db_models import File, File2Document, Document
-
-    current_file_paths = set()
-    for file_path, rel_path in files_to_import:
-        current_file_paths.add(file_path)
-
-    existing_docs = list(DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value))
-    deleted_count = 0
-    skipped_count = 0
-    reparsed_count = 0
-
-    for existing_doc in existing_docs:
-        doc_location = existing_doc.location
-        if not doc_location or not doc_location.startswith(path):
-            continue
-
-        if doc_location not in current_file_paths:
-            try:
-                File2DocumentService.delete_by_document_id(existing_doc.id)
-            except:
-                pass
-            try:
-                File.delete_by_id(existing_doc.id)
-            except:
-                pass
-            try:
-                tenant_id = DocumentService.get_tenant_id(existing_doc.id)
-                DocumentService.remove_document(existing_doc, tenant_id)
-            except Exception as e:
-                logging.warning(f"Failed to delete document {existing_doc.id}: {e}")
-            deleted_count += 1
-            logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
-        else:
-            try:
-                file_stat = os.stat(doc_location)
-                if existing_doc.size == file_stat.st_size:
-                    skipped_count += 1
-                    logging.info(f"Skipped (unchanged): {existing_doc.name}, size: {file_stat.st_size}")
-                    continue
-                else:
-                    reparsed_count += 1
-                    logging.info(f"Re-parsing (modified): {existing_doc.name}, old size: {existing_doc.size}, new size: {file_stat.st_size}")
-                    try:
-                        File2DocumentService.delete_by_document_id(existing_doc.id)
-                    except:
-                        pass
-                    try:
-                        File.delete_by_id(existing_doc.id)
-                    except:
-                        pass
-                    try:
-                        tenant_id = DocumentService.get_tenant_id(existing_doc.id)
-                        DocumentService.remove_document(existing_doc, tenant_id)
-                    except Exception as e:
-                        logging.warning(f"Failed to delete document {existing_doc.id} for re-parsing: {e}")
-            except OSError:
-                pass
-
-    logging.info(f"Scan summary: deleted={deleted_count}, skipped={skipped_count}, reparsed={reparsed_count}, new={len(files_to_import) - skipped_count - reparsed_count}")
-
-    for file_path, rel_path in files_to_import:
-        try:
-            from api.db.services.document_service import DocumentService
-            from api.db.services.file2document_service import File2DocumentService
-
-            existing_docs = list(DocumentService.query(kb_id=kb.id, location=file_path))
-            if existing_docs:
-                skipped_count += 1
-                continue
-
-            filename = os.path.basename(file_path)
-            from uuid import uuid4
-
-            doc_id = uuid4().hex
-
-            from api.utils.file_utils import filename_type
-            from api.db import FileType
-            from common.constants import ParserType
-
-            filetype = filename_type(filename)
-            file_parser = kb.parser_id
-            if filetype == FileType.VISUAL.value:
-                file_parser = ParserType.PICTURE.value
-            elif filetype == FileType.AURAL.value:
-                file_parser = ParserType.AUDIO.value
-
-            doc = {
-                "id": doc_id,
-                "kb_id": kb.id,
-                "parser_id": file_parser,
-                "pipeline_id": kb.pipeline_id,
-                "parser_config": kb.parser_config,
-                "created_by": current_user.id,
-                "type": filename.split(".")[-1] if "." in filename else "",
-                "name": filename,
-                "source_type": FileSource.LOCAL_SCAN.value,
-                "suffix": filename.split(".")[-1] if "." in filename else "",
-                "location": file_path,
-                "size": os.path.getsize(file_path),
-                "thumbnail": "",
-                "content_hash": "",
-                "run": "0",
-                "status": "1",
-                "progress": 0,
-            }
-            logging.info(f"Inserting doc: {doc}")
-            try:
-                DocumentService.insert(doc)
-
-                kb_folder = FileService.get_kb_folder(kb.tenant_id)
-                parent_id = kb_folder.get("id")
-
-                file_rec = {
-                    "id": doc_id,
-                    "parent_id": parent_id,
-                    "tenant_id": kb.tenant_id,
-                    "created_by": current_user.id,
-                    "name": filename,
-                    "location": file_path,
-                    "size": os.path.getsize(file_path),
-                    "type": filename.split(".")[-1] if "." in filename else "",
-                    "source_type": "",
-                }
-                File.insert(**file_rec).execute()
-
-                try:
-                    f2d_id = doc_id  # Use same ID as doc_id for simplicity
-                    File2Document.insert(id=f2d_id, document_id=doc_id, file_id=doc_id).execute()
-                except Exception as f2d_err:
-                    if "Duplicate" in str(f2d_err):
-                        logging.warning(f"File2Document already exists for doc_id={doc_id}, skipping")
-                    else:
-                        raise
-
-                doc["run"] = "1"
-                doc["tenant_id"] = kb.tenant_id
-                DocumentService.run(kb.tenant_id, doc, {})
-
-                logging.info(f"Inserted and started parsing document: {doc_id}, kb_id={kb.id}")
-                imported_docs.append(doc_id)
-            except Exception as insert_err:
-                logging.error(f"Failed to insert: {str(insert_err)}")
-                errors.append(f"{rel_path}: {str(insert_err)}")
-        except Exception as e:
-            logging.error(f"Failed to process file: {str(e)}")
-            errors.append(f"{rel_path}: {str(e)}")
-
-    return get_json_result(data={"imported": imported_docs, "errors": errors, "scan_dir_id": scan_dir_id, "deleted": deleted_count, "skipped": skipped_count, "reparsed": reparsed_count})
+    return get_json_result(data=data)
 
 
 @manager.route("/scanned_directories", methods=["GET"])
@@ -1468,7 +1214,9 @@ async def get_scanned_directories():
                     if time_since_last_scan >= d.scan_interval_minutes:
                         logging.info(f"Triggering auto-scan for directory: {d.directory_path}, kb_id={kb_id}")
                         try:
-                            do_scan_path(kb_id, d.directory_path, d.scan_interval_minutes)
+                            success, data, error = ScannedDirectoryService.scan_directory(kb_id, d.directory_path, d.scan_interval_minutes, tenant_id=kb.tenant_id)
+                            if not success:
+                                logging.error(f"Auto-scan failed for {d.directory_path}: {error}")
                         except Exception as scan_err:
                             logging.error(f"Auto-scan failed for {d.directory_path}: {str(scan_err)}")
         except Exception as e:
@@ -1537,7 +1285,7 @@ async def delete_scanned_directory(directory_id):
     deleted_docs = 0
     dir_path = directory.directory_path
 
-    all_docs = list(DocumentService.query(kb_id=kb.id))
+    all_docs = DocumentService.query(kb_id=kb.id, source_type=FileSource.LOCAL_SCAN.value)
     for doc in all_docs:
         if doc.location and doc.location.startswith(dir_path):
             doc_id = doc.id
