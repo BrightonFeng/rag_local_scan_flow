@@ -26,7 +26,7 @@ from api.db.db_models import LLM
 from api.db.services.common_service import CommonService
 from api.db.services.tenant_llm_service import LLM4Tenant, TenantLLMService
 from common.constants import LLMType
-from common.token_utils import num_tokens_from_string
+from common.token_utils import num_tokens_from_string, truncate
 
 
 class LLMService(CommonService):
@@ -84,7 +84,8 @@ def get_init_tenant_llm(user_id):
 
 class LLMBundle(LLM4Tenant):
     def __init__(self, tenant_id: str, model_config: dict, lang="Chinese", **kwargs):
-        super().__init__(tenant_id, model_config, lang, **kwargs)
+        max_len = model_config.get("max_tokens", 8192)
+        super().__init__(tenant_id, model_config, lang, max_length=max_len, **kwargs)
 
     def bind_tools(self, toolcall_session, tools):
         if not self.is_tools:
@@ -100,8 +101,7 @@ class LLMBundle(LLM4Tenant):
         for text in texts:
             token_size = num_tokens_from_string(text)
             if token_size > self.max_length:
-                target_len = int(self.max_length * 0.95)
-                safe_texts.append(text[:target_len])
+                safe_texts.append(truncate(text, int(self.max_length * 0.95)))
             else:
                 safe_texts.append(text)
 
