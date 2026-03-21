@@ -88,13 +88,15 @@ def do_scan(kb_id, path, scan_interval=60):
         r".*\.(jpg|jpeg|png|tif|gif|pcx|tga|exif|fpx|svg|psd|cdr|pcd|dxf|ufo|eps|ai|raw|webp|avif|apng|icon|ico|mpg|mpeg|avi|rm|rmvb|mov|wmv|asf|dat|asx|wvx|mpe|mpa|mp4|avi|mkv)$"
     )
 
+    MAX_SCAN_FILE_COUNT = 10000
     files_to_import = []
     for root, dirs, files in os.walk(path):
         for file in files:
             if re.match(supported_extensions, file, re.IGNORECASE):
-                file_path = os.path.join(root, file)
-                rel_path = os.path.relpath(file_path, path)
-                files_to_import.append((file_path, rel_path))
+                files_to_import.append((os.path.join(root, file), os.path.relpath(os.path.join(root, file), path)))
+                if len(files_to_import) > MAX_SCAN_FILE_COUNT:
+                    logging.warning(f"Directory {path} has over {MAX_SCAN_FILE_COUNT} files, skipped.")
+                    return
 
     if not files_to_import:
         logging.info(f"No supported files found in: {path}")
