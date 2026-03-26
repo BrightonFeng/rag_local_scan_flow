@@ -52,6 +52,10 @@ async def image2id(d: dict, storage_put_func: partial, objname: str, bucket: str
 
             if not isinstance(img, Image.Image):
                 return None
+            max_dim = 200
+            orig_w, orig_h = img.size
+            if orig_w > max_dim or orig_h > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
             if img.mode in ("RGBA", "P"):
                 orig_img = img
@@ -63,7 +67,7 @@ async def image2id(d: dict, storage_put_func: partial, objname: str, bucket: str
                         pass
 
             try:
-                img.save(buf, format="JPEG")
+                img.save(buf, format="JPEG", quality=85)
                 buf.seek(0)
                 return buf.getvalue()
             except OSError as e:

@@ -1,9 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { Docagg } from '@/interfaces/database/chat';
-import { api_host } from '@/utils/api';
-import { getAuthorization } from '@/utils/authorization-util';
 import { middleEllipsis } from '@/utils/common-util';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import { useState } from 'react';
 import FileIcon from '../file-icon';
 
@@ -12,12 +11,7 @@ export function ReferenceDocumentList({ list }: { list: Docagg[] }) {
   const [selectedDocument, setSelectedDocument] = useState<Docagg>();
 
   const handleDocumentClick = (item: Docagg) => {
-    const auth = getAuthorization();
-    const docUrl = `${api_host}/document/get/${item.doc_id}`;
-    const urlWithAuth = auth
-      ? `${docUrl}?jwt_auth=${encodeURIComponent(auth)}`
-      : docUrl;
-    window.open(urlWithAuth, '_blank');
+    window.open(buildLocalScanDocUrl(item.doc_id), '_blank');
   };
 
   return (
@@ -30,7 +24,9 @@ export function ReferenceDocumentList({ list }: { list: Docagg[] }) {
           >
             <FileIcon id={item.doc_id} name={item.doc_name}></FileIcon>
             <div className="text-text-sub-title-invert">
-              {middleEllipsis(item.doc_name)}
+              {item.source_type === 'local_scan' && item.location
+                ? item.location
+                : middleEllipsis(item.doc_name)}
             </div>
           </CardContent>
         </Card>

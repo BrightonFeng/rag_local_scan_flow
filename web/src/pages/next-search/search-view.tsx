@@ -14,9 +14,8 @@ import {
 import { RAGFlowPagination } from '@/components/ui/ragflow-pagination';
 import { IReference } from '@/interfaces/database/chat';
 import { cn } from '@/lib/utils';
-import { api_host } from '@/utils/api';
-import { getAuthorization } from '@/utils/authorization-util';
 import { citationMarkerReg } from '@/utils/citation-utils';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import { getDirAttribute } from '@/utils/text-direction';
 import DOMPurify from 'dompurify';
 import { isEmpty } from 'lodash';
@@ -209,11 +208,28 @@ export default function SearchingView({
                       <div key={index}>
                         <div className="w-full flex flex-col">
                           <div className="w-full highlightContent">
-                            {(chunk.image_id || chunk.img_id) && (
-                              <ImageWithPopover
-                                id={chunk.image_id || chunk.img_id}
-                              ></ImageWithPopover>
-                            )}
+                            {(chunk.image_id || chunk.img_id) &&
+                              (chunk.source_type === 'local_scan' &&
+                              chunk.doc_id ? (
+                                <div
+                                  className="cursor-pointer"
+                                  onClick={() =>
+                                    window.open(
+                                      buildLocalScanDocUrl(chunk.doc_id),
+                                      '_blank',
+                                    )
+                                  }
+                                >
+                                  <Image
+                                    id={chunk.image_id || chunk.img_id}
+                                    className="max-h-[100px] inline-block"
+                                  ></Image>
+                                </div>
+                              ) : (
+                                <ImageWithPopover
+                                  id={chunk.image_id || chunk.img_id}
+                                ></ImageWithPopover>
+                              ))}
                             <Popover>
                               <PopoverTrigger asChild>
                                 <div
@@ -252,12 +268,10 @@ export default function SearchingView({
                                 chunk.source_type === 'local_scan' &&
                                 chunk.location
                               ) {
-                                const auth = getAuthorization();
-                                const docUrl = `${api_host}/document/get/${chunk.doc_id}`;
-                                const urlWithAuth = auth
-                                  ? `${docUrl}?jwt_auth=${encodeURIComponent(auth)}`
-                                  : docUrl;
-                                window.open(urlWithAuth, '_blank');
+                                window.open(
+                                  buildLocalScanDocUrl(chunk.doc_id),
+                                  '_blank',
+                                );
                               } else {
                                 clickDocumentButton(chunk.doc_id, chunk as any);
                               }

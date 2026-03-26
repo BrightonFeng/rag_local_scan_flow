@@ -3,6 +3,7 @@ import SvgIcon from '@/components/svg-icon';
 import { IReference, IReferenceChunk } from '@/interfaces/database/chat';
 import { citationMarkerReg } from '@/utils/citation-utils';
 import { getExtension } from '@/utils/document-util';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import { getDirAttribute } from '@/utils/text-direction';
 import DOMPurify from 'dompurify';
 import { useCallback, useEffect, useMemo } from 'react';
@@ -79,13 +80,15 @@ const MarkdownContent = ({
       chunk: IReferenceChunk,
       isPdf: boolean,
       documentUrl?: string,
+      localScanUrl?: string,
     ) =>
       () => {
         if (!isPdf) {
-          if (!documentUrl) {
+          const url = localScanUrl || documentUrl;
+          if (!url) {
             return;
           }
-          window.open(documentUrl, '_blank');
+          window.open(url, '_blank');
         } else {
           clickDocumentButton?.(documentId, chunk);
         }
@@ -122,6 +125,12 @@ const MarkdownContent = ({
       const fileThumbnail = documentId ? fileThumbnails[documentId] : '';
       const fileExtension = documentId ? getExtension(document?.doc_name) : '';
       const imageId = chunkItem?.image_id;
+      const sourceType = document?.source_type;
+      const location = document?.location;
+      const localScanUrl =
+        sourceType === 'local_scan' && documentId
+          ? buildLocalScanDocUrl(documentId)
+          : undefined;
 
       return {
         documentUrl,
@@ -131,6 +140,9 @@ const MarkdownContent = ({
         chunkItem,
         documentId,
         document,
+        sourceType,
+        location,
+        localScanUrl,
       };
     },
     [fileThumbnails, reference],
@@ -146,26 +158,40 @@ const MarkdownContent = ({
         chunkItem,
         documentId,
         document,
+        sourceType,
+        location,
+        localScanUrl,
       } = getReferenceInfo(chunkIndex);
 
       return (
         <div key={chunkItem?.id} className="flex gap-2">
-          {imageId && (
-            <HoverCard>
-              <HoverCardTrigger>
+          {imageId &&
+            (localScanUrl ? (
+              <div
+                className="cursor-pointer"
+                onClick={() => window.open(localScanUrl, '_blank')}
+              >
                 <Image
                   id={imageId}
                   className={styles.referenceChunkImage}
                 ></Image>
-              </HoverCardTrigger>
-              <HoverCardContent>
-                <Image
-                  id={imageId}
-                  className={styles.referenceImagePreview}
-                ></Image>
-              </HoverCardContent>
-            </HoverCard>
-          )}
+              </div>
+            ) : (
+              <HoverCard>
+                <HoverCardTrigger>
+                  <Image
+                    id={imageId}
+                    className={styles.referenceChunkImage}
+                  ></Image>
+                </HoverCardTrigger>
+                <HoverCardContent>
+                  <Image
+                    id={imageId}
+                    className={styles.referenceImagePreview}
+                  ></Image>
+                </HoverCardContent>
+              </HoverCard>
+            ))}
           <div className={'space-y-2 max-w-[40vw]'}>
             <div
               dangerouslySetInnerHTML={{
@@ -175,17 +201,31 @@ const MarkdownContent = ({
               dir="auto"
             ></div>
             {documentId && (
-              <section className="flex gap-1">
+              <section className="flex gap-1" style={{ cursor: 'pointer' }}>
                 {fileThumbnail ? (
                   <img
                     src={fileThumbnail}
                     alt=""
                     className={styles.fileThumbnail}
+                    onClick={handleDocumentButtonClick(
+                      documentId,
+                      chunkItem,
+                      fileExtension === 'pdf',
+                      documentUrl,
+                      localScanUrl,
+                    )}
                   />
                 ) : (
                   <SvgIcon
                     name={`file-icon/${fileExtension}`}
                     width={24}
+                    onClick={handleDocumentButtonClick(
+                      documentId,
+                      chunkItem,
+                      fileExtension === 'pdf',
+                      documentUrl,
+                      localScanUrl,
+                    )}
                   ></SvgIcon>
                 )}
                 <Button
@@ -196,9 +236,12 @@ const MarkdownContent = ({
                     chunkItem,
                     fileExtension === 'pdf',
                     documentUrl,
+                    localScanUrl,
                   )}
                 >
-                  {document?.doc_name}
+                  {sourceType === 'local_scan' && location
+                    ? location
+                    : document?.doc_name}
                 </Button>
               </section>
             )}

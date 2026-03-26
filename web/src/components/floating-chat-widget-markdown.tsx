@@ -16,6 +16,7 @@ import {
 } from '@/utils/chat';
 import { citationMarkerReg } from '@/utils/citation-utils';
 import { getExtension } from '@/utils/document-util';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import { getDirAttribute } from '@/utils/text-direction';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import classNames from 'classnames';
@@ -83,12 +84,18 @@ const FloatingChatWidgetMarkdown = ({
       chunk: IReferenceChunk,
       isPdf: boolean,
       documentUrl?: string,
+      localScanUrl?: string,
     ) =>
       () => {
         if (!documentId) return;
-        if (!isPdf && documentUrl) {
-          window.open(documentUrl, '_blank');
-        } else if (clickDocumentButton) {
+        if (!isPdf) {
+          const url = localScanUrl || documentUrl;
+          if (url) {
+            window.open(url, '_blank');
+            return;
+          }
+        }
+        if (clickDocumentButton) {
           clickDocumentButton(documentId, chunk);
         }
       },
@@ -127,6 +134,12 @@ const FloatingChatWidgetMarkdown = ({
       const fileExtension = documentId
         ? getExtension(document?.doc_name ?? '')
         : '';
+      const sourceType = document?.source_type;
+      const location = document?.location;
+      const localScanUrl =
+        sourceType === 'local_scan' && documentId
+          ? buildLocalScanDocUrl(documentId)
+          : undefined;
       return {
         documentUrl,
         fileThumbnail,
@@ -135,6 +148,9 @@ const FloatingChatWidgetMarkdown = ({
         chunkItem,
         documentId,
         document,
+        sourceType,
+        location,
+        localScanUrl,
       };
     },
     [fileThumbnails, reference, getDocumentUrl],
@@ -160,6 +176,9 @@ const FloatingChatWidgetMarkdown = ({
         chunkItem,
         documentId,
         document,
+        sourceType,
+        location,
+        localScanUrl,
       } = info;
 
       return (
@@ -167,22 +186,30 @@ const FloatingChatWidgetMarkdown = ({
           key={`popover-content-${chunkItem.id}`}
           className="flex gap-2 widget-citation-content"
         >
-          {imageId && (
-            <Popover>
-              <TooltipTrigger asChild>
-                <Image
-                  id={imageId}
-                  className="w-24 h-24 object-contain rounded m-1 cursor-pointer"
-                />
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <Image
-                  id={imageId}
-                  className="max-w-[80vw] max-h-[60vh] rounded"
-                />
-              </TooltipContent>
-            </Popover>
-          )}
+          {imageId &&
+            (localScanUrl ? (
+              <div
+                className="w-24 h-24 rounded m-1 cursor-pointer overflow-hidden"
+                onClick={() => window.open(localScanUrl, '_blank')}
+              >
+                <Image id={imageId} className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <Popover>
+                <TooltipTrigger asChild>
+                  <Image
+                    id={imageId}
+                    className="w-24 h-24 object-contain rounded m-1 cursor-pointer"
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <Image
+                    id={imageId}
+                    className="max-w-[80vw] max-h-[60vh] rounded"
+                  />
+                </TooltipContent>
+              </Popover>
+            ))}
           <div className="space-y-2 flex-1 min-w-0">
             <div
               dangerouslySetInnerHTML={{
@@ -191,15 +218,35 @@ const FloatingChatWidgetMarkdown = ({
               className="max-h-[250px] overflow-y-auto text-xs leading-relaxed p-2 bg-gray-50 dark:bg-gray-800 rounded prose-sm"
             ></div>
             {documentId && (
-              <section className="flex gap-1 justify-center">
+              <section
+                className="flex gap-1 justify-center"
+                style={{ cursor: 'pointer' }}
+              >
                 {fileThumbnail ? (
                   <img
                     src={fileThumbnail}
                     alt={document?.doc_name}
                     className="w-6 h-6 rounded"
+                    onClick={handleDocumentButtonClick(
+                      documentId,
+                      chunkItem,
+                      fileExtension === 'pdf',
+                      documentUrl,
+                      localScanUrl,
+                    )}
                   />
                 ) : (
-                  <SvgIcon name={`file-icon/${fileExtension}`} width={20} />
+                  <SvgIcon
+                    name={`file-icon/${fileExtension}`}
+                    width={20}
+                    onClick={handleDocumentButtonClick(
+                      documentId,
+                      chunkItem,
+                      fileExtension === 'pdf',
+                      documentUrl,
+                      localScanUrl,
+                    )}
+                  />
                 )}
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -212,12 +259,17 @@ const FloatingChatWidgetMarkdown = ({
                         chunkItem,
                         fileExtension === 'pdf',
                         documentUrl,
+                        localScanUrl,
                       )}
-                      disabled={!documentUrl && fileExtension !== 'pdf'}
+                      disabled={
+                        !documentUrl && !localScanUrl && fileExtension !== 'pdf'
+                      }
                       style={{ whiteSpace: 'normal' }}
                     >
                       <span className="truncate">
-                        {document?.doc_name ?? 'Unnamed Document'}
+                        {sourceType === 'local_scan' && location
+                          ? location
+                          : (document?.doc_name ?? 'Unnamed Document')}
                       </span>
                     </Button>
                   </TooltipTrigger>
@@ -253,8 +305,14 @@ const FloatingChatWidgetMarkdown = ({
           );
         }
 
-        const { imageId, chunkItem, documentId, fileExtension, documentUrl } =
-          info;
+        const {
+          imageId,
+          chunkItem,
+          documentId,
+          fileExtension,
+          documentUrl,
+          localScanUrl,
+        } = info;
 
         if (showImage(chunkItem?.doc_type)) {
           return (
@@ -267,6 +325,7 @@ const FloatingChatWidgetMarkdown = ({
                 chunkItem,
                 fileExtension === 'pdf',
                 documentUrl,
+                localScanUrl,
               )}
             />
           );

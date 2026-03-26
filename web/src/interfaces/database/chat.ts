@@ -148,6 +148,8 @@ export interface Docagg {
   doc_id: string;
   doc_name: string;
   url?: string;
+  source_type?: string;
+  location?: string;
 }
 
 // interface Chunk {

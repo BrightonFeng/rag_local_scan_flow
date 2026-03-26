@@ -491,6 +491,11 @@ async def retrieval_test():
             if doc_id and doc_id in doc_info_map:
                 c["source_type"] = doc_info_map[doc_id]["source_type"]
                 c["location"] = doc_info_map[doc_id]["location"]
+        for d in ranks.get("doc_aggs", []):
+            doc = doc_info_map.get(d.get("doc_id"))
+            if doc:
+                d["source_type"] = doc["source_type"]
+                d["location"] = doc["location"]
         ranks["labels"] = labels
 
         return get_json_result(data=ranks)

@@ -2,6 +2,7 @@ import Image from '@/components/image';
 import SvgIcon from '@/components/svg-icon';
 import { IReference, IReferenceChunk } from '@/interfaces/database/chat';
 import { getExtension } from '@/utils/document-util';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import DOMPurify from 'dompurify';
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import Markdown from 'react-markdown';
@@ -150,24 +151,42 @@ const MarkdownContent = ({
         document,
       } = getReferenceInfo(chunkIndex);
 
+      const isLocalScan =
+        (document?.source_type === 'local_scan' ||
+          chunkItem?.source_type === 'local_scan') &&
+        documentId;
+
       return (
         <div key={chunkItem?.id} className="flex gap-2">
-          {imageId && (
-            <Popover>
-              <PopoverTrigger>
+          {imageId &&
+            (isLocalScan && documentId ? (
+              <div
+                className="cursor-pointer"
+                onClick={() =>
+                  window.open(buildLocalScanDocUrl(documentId), '_blank')
+                }
+              >
                 <Image
                   id={imageId}
                   className={styles.referenceChunkImage}
                 ></Image>
-              </PopoverTrigger>
-              <PopoverContent>
-                <Image
-                  id={imageId}
-                  className={styles.referenceImagePreview}
-                ></Image>
-              </PopoverContent>
-            </Popover>
-          )}
+              </div>
+            ) : (
+              <Popover>
+                <PopoverTrigger>
+                  <Image
+                    id={imageId}
+                    className={styles.referenceChunkImage}
+                  ></Image>
+                </PopoverTrigger>
+                <PopoverContent>
+                  <Image
+                    id={imageId}
+                    className={styles.referenceImagePreview}
+                  ></Image>
+                </PopoverContent>
+              </Popover>
+            ))}
           <div className={'space-y-2 max-w-[40vw]'}>
             <div
               dangerouslySetInnerHTML={{
@@ -195,14 +214,19 @@ const MarkdownContent = ({
                     styles.documentLink,
                     'text-wrap flex-1 h-auto',
                   )}
-                  onClick={handleDocumentButtonClick(
-                    documentId,
-                    chunkItem,
-                    // fileExtension === 'pdf',
-                    // documentUrl,
-                  )}
+                  onClick={
+                    isLocalScan
+                      ? () =>
+                          window.open(
+                            buildLocalScanDocUrl(documentId),
+                            '_blank',
+                          )
+                      : handleDocumentButtonClick(documentId, chunkItem)
+                  }
                 >
-                  {document?.doc_name}
+                  {isLocalScan && (document?.location || chunkItem?.location)
+                    ? document?.location || chunkItem?.location
+                    : document?.doc_name}
                 </Button>
               </div>
             )}

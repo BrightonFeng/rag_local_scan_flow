@@ -25,6 +25,7 @@ from timeit import default_timer as timer
 from langfuse import Langfuse
 from peewee import fn
 from api.db.services.file_service import FileService
+from api.db.services.document_service import DocumentService
 from common.constants import LLMType, ParserType, StatusEnum
 from api.db.db_models import DB, Dialog
 from api.db.services.common_service import CommonService
@@ -632,6 +633,22 @@ async def async_chat(dialog, messages, stream=True, **kwargs):
                 if ck["content_with_weight"]:
                     kbinfos["chunks"].insert(0, ck)
 
+            if kbinfos.get("doc_aggs"):
+                doc_ids = [d["doc_id"] for d in kbinfos["doc_aggs"] if d.get("doc_id")]
+                if doc_ids:
+                    docs = {doc.id: doc for doc in DocumentService.get_by_ids(doc_ids)}
+                    for d in kbinfos["doc_aggs"]:
+                        doc = docs.get(d.get("doc_id"))
+                        if doc:
+                            d["source_type"] = doc.source_type
+                            d["location"] = doc.location
+                    for c in kbinfos["chunks"]:
+                        doc_id = c.get("doc_id") or c.get("document_id")
+                        doc = docs.get(doc_id) if doc_id else None
+                        if doc:
+                            c["source_type"] = doc.source_type
+                            c["location"] = doc.location
+
     knowledges = kb_prompt(kbinfos, max_tokens)
     logging.debug("{}->{}".format(" ".join(questions), "\n->".join(knowledges)))
 
@@ -803,6 +820,27 @@ async def use_sql(question, field_map, tenant_id, chat_mdl, quota=True, kb_ids=N
         logging.debug(f"use_sql: Using ES/OS table name: {table_name}")
 
     expected_doc_name_column = "docnm" if doc_engine == "infinity" else "docnm_kwd"
+
+    def enrich_references(chunks, doc_aggs):
+        """Add source_type and location to chunks and doc_aggs from DocumentService."""
+        if not doc_aggs:
+            return chunks, doc_aggs
+        doc_ids = [d.get("doc_id") for d in doc_aggs if d.get("doc_id")]
+        if not doc_ids:
+            return chunks, doc_aggs
+        docs = {doc.id: doc for doc in DocumentService.get_by_ids(doc_ids)}
+        for d in doc_aggs:
+            doc = docs.get(d.get("doc_id"))
+            if doc:
+                d["source_type"] = doc.source_type
+                d["location"] = doc.location
+        for c in chunks:
+            doc_id = c.get("doc_id") or c.get("document_id")
+            doc = docs.get(doc_id) if doc_id else None
+            if doc:
+                c["source_type"] = doc.source_type
+                c["location"] = doc.location
+        return chunks, doc_aggs
 
     def has_source_columns(columns):
         normalized_names = {str(col.get("name", "")).lower() for col in columns}
@@ -1202,7 +1240,8 @@ Please correct the error and write SQL again using json_extract_string(chunk_dat
                                     doc_aggs[doc_id] = {"doc_name": doc_name, "count": 0}
                                 doc_aggs[doc_id]["count"] += 1
                             doc_aggs_list = [{"doc_id": did, "doc_name": d["doc_name"], "count": d["count"]} for did, d in doc_aggs.items()]
-                            logging.debug(f"use_sql: Returning aggregate answer with {len(chunks)} chunks from {len(doc_aggs)} documents")
+                            chunks, doc_aggs_list = enrich_references(chunks, doc_aggs_list)
+                            logging.debug(f"use_sql: Returning aggregate answer with {len(chunks)} chunks from {len(doc_aggs_list)} documents")
                             return {"answer": answer, "reference": {"chunks": chunks, "doc_aggs": doc_aggs_list}, "prompt": sys_prompt}
                 except Exception as e:
                     logging.warning(f"use_sql: Failed to fetch chunks: {e}")
@@ -1219,11 +1258,15 @@ Please correct the error and write SQL again using json_extract_string(chunk_dat
             doc_aggs[r[docid_idx]] = {"doc_name": r[doc_name_idx], "count": 0}
         doc_aggs[r[docid_idx]]["count"] += 1
 
+    chunks = [{"doc_id": r[docid_idx], "docnm_kwd": r[doc_name_idx]} for r in tbl["rows"]]
+    doc_aggs_list = [{"doc_id": did, "doc_name": d["doc_name"], "count": d["count"]} for did, d in doc_aggs.items()]
+    chunks, doc_aggs_list = enrich_references(chunks, doc_aggs_list)
+
     result = {
         "answer": "\n".join([columns, line, rows]),
         "reference": {
-            "chunks": [{"doc_id": r[docid_idx], "docnm_kwd": r[doc_name_idx]} for r in tbl["rows"]],
-            "doc_aggs": [{"doc_id": did, "doc_name": d["doc_name"], "count": d["count"]} for did, d in doc_aggs.items()],
+            "chunks": chunks,
+            "doc_aggs": doc_aggs_list,
         },
         "prompt": sys_prompt,
     }

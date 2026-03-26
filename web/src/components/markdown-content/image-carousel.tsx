@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/carousel';
 import { IReference, IReferenceChunk } from '@/interfaces/database/chat';
 import { getExtension } from '@/utils/document-util';
+import { buildLocalScanDocUrl } from '@/utils/local-scan-doc';
 import { useCallback } from 'react';
 
 interface ImageCarouselProps {
@@ -23,6 +24,7 @@ interface ImageCarouselProps {
     chunk: IReferenceChunk,
     isPdf: boolean,
     documentUrl?: string,
+    localScanUrl?: string,
   ) => void;
 }
 
@@ -34,6 +36,9 @@ interface ReferenceInfo {
   chunkItem?: IReferenceChunk;
   documentId?: string;
   document?: any;
+  sourceType?: string;
+  location?: string;
+  localScanUrl?: string;
 }
 
 const getReferenceInfo = (
@@ -51,6 +56,12 @@ const getReferenceInfo = (
   const fileThumbnail = documentId ? fileThumbnails[documentId] : '';
   const fileExtension = documentId ? getExtension(document?.doc_name) : '';
   const imageId = chunkItem?.image_id;
+  const sourceType = document?.source_type;
+  const location = document?.location;
+  const localScanUrl =
+    sourceType === 'local_scan' && documentId
+      ? buildLocalScanDocUrl(documentId)
+      : undefined;
 
   return {
     documentUrl,
@@ -60,6 +71,9 @@ const getReferenceInfo = (
     chunkItem,
     documentId,
     document,
+    sourceType,
+    location,
+    localScanUrl,
   };
 };
 
@@ -81,6 +95,7 @@ export const ImageCarousel = ({
       documentId: string,
       fileExtension: string,
       documentUrl?: string,
+      localScanUrl?: string,
     ) =>
       () =>
         onImageClick(
@@ -88,6 +103,7 @@ export const ImageCarousel = ({
           chunkItem,
           fileExtension === 'pdf',
           documentUrl,
+          localScanUrl,
         ),
     [onImageClick],
   );
@@ -103,8 +119,14 @@ export const ImageCarousel = ({
       <CarouselContent>
         {group.map((ref) => {
           const chunkIndex = getChunkIndex(ref.id);
-          const { documentUrl, fileExtension, imageId, chunkItem, documentId } =
-            getReferenceInfo(chunkIndex, reference, fileThumbnails);
+          const {
+            documentUrl,
+            fileExtension,
+            imageId,
+            chunkItem,
+            documentId,
+            localScanUrl,
+          } = getReferenceInfo(chunkIndex, reference, fileThumbnails);
 
           return (
             <CarouselItem key={ref.id}>
@@ -120,6 +142,7 @@ export const ImageCarousel = ({
                           documentId,
                           fileExtension!,
                           documentUrl,
+                          localScanUrl,
                         )
                       : () => {}
                   }
