@@ -775,6 +775,9 @@ async def get(doc_id):
         if not content_type:
             content_type = "application/octet-stream"
         response.headers["Content-Type"] = content_type
+
+        if ext and ext.lower() in ["mp4", "webm", "ogg", "mov"]:
+            response.headers["Content-Disposition"] = "inline"
         return response
     except Exception as e:
         return server_error_response(e)

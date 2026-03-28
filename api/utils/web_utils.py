@@ -37,10 +37,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 OTP_LENGTH = 4
-OTP_TTL_SECONDS = 5 * 60 # valid for 5 minutes
-ATTEMPT_LIMIT = 5 # maximum attempts
-ATTEMPT_LOCK_SECONDS = 30 * 60 # lock for 30 minutes
-RESEND_COOLDOWN_SECONDS = 60 # cooldown for 1 minute
+OTP_TTL_SECONDS = 5 * 60  # valid for 5 minutes
+ATTEMPT_LIMIT = 5  # maximum attempts
+ATTEMPT_LOCK_SECONDS = 30 * 60  # lock for 30 minutes
+RESEND_COOLDOWN_SECONDS = 60  # cooldown for 1 minute
 
 
 CONTENT_TYPE_MAP = {
@@ -86,6 +86,13 @@ CONTENT_TYPE_MAP = {
     "ico": "image/x-icon",
     "avif": "image/avif",
     "heic": "image/heic",
+    # Video formats
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "ogg": "video/ogg",
+    "mov": "video/quicktime",
+    "avi": "video/x-msvideo",
+    "mkv": "video/x-matroska",
     # PPTX
     "ppt": "application/vnd.ms-powerpoint",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
