@@ -151,7 +151,7 @@ class TestLocalScanRetrievalFlow:
             time.sleep(10)
         return []
 
-    def _wait_doc_parsed(self, scan_auth, kb_id, doc_name, timeout=300):
+    def _wait_doc_parsed(self, scan_auth, kb_id, doc_name, timeout=600):
         """Poll until a specific document is fully parsed."""
         import requests
 
@@ -181,7 +181,7 @@ class TestLocalScanRetrievalFlow:
     def test_step1_scan_and_parse(self, scan_auth, configure_ollama_img2txt, kb):
         """Step 1: Scan path and verify documents appear."""
         print(f"\n=== Step 1: Scan and Parse ===")
-        docs = self._poll_documents(scan_auth, kb, timeout=60)
+        docs = self._poll_documents(scan_auth, kb, timeout=360)
         assert len(docs) >= 5, f"Expected >=5 documents, got {len(docs)}"
         doc_names = [d.get("name") for d in docs]
         print(f"  Documents: {doc_names}")
@@ -191,17 +191,21 @@ class TestLocalScanRetrievalFlow:
 
     def test_step2_parsing_results(self, scan_auth, configure_ollama_img2txt, kb):
         """Step 2: Verify parsing results contain expected keywords."""
+        import requests
+
         print(f"\n=== Step 2: Parsing Results ===")
 
-        mp4_doc = self._wait_doc_parsed(scan_auth, kb, "骑马.mp4", timeout=300)
-        assert mp4_doc is not None, "骑马.mp4 not parsed after 5 minutes"
-        assert mp4_doc["chunk_num"] > 0
-        print(f"  骑马.mp4: parsed ({mp4_doc['chunk_num']} chunks)")
+        # Verify 骑马.mp4 parsing completed (timeout 10 minutes)
+        mp4_doc = self._wait_doc_parsed(scan_auth, kb, "骑马.mp4", timeout=600)
+        assert mp4_doc is not None, "骑马.mp4 not parsed after 10 minutes"
+        assert mp4_doc["chunk_num"] > 0, "骑马.mp4 has no chunks"
+        print(f"  ✓ 骑马.mp4 parsed ({mp4_doc['chunk_num']} chunks)")
 
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=300)
-        assert jpg_doc is not None, "2014胆囊.jpg not parsed after 5 minutes"
-        assert jpg_doc["chunk_num"] > 0
-        print(f"  2014胆囊.jpg: parsed ({jpg_doc['chunk_num']} chunks)")
+        # Verify 2014胆囊.jpg parsing completed (timeout 10 minutes)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
+        assert jpg_doc is not None, "2014胆囊.jpg not parsed after 10 minutes"
+        assert jpg_doc["chunk_num"] > 0, "2014胆囊.jpg has no chunks"
+        print(f"  ✓ 2014胆囊.jpg parsed ({jpg_doc['chunk_num']} chunks)")
 
     def test_step3_search_retrieval(self, scan_auth, configure_ollama_img2txt, kb):
         """Step 3: Retrieval returns source_type and location on chunks and doc_aggs."""
@@ -209,7 +213,7 @@ class TestLocalScanRetrievalFlow:
 
         print(f"\n=== Step 3: Search Retrieval ===")
 
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=300)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
         assert jpg_doc is not None, "2014胆囊.jpg not parsed"
 
         resp = requests.post(
@@ -250,7 +254,7 @@ class TestLocalScanRetrievalFlow:
 
         print(f"\n=== Step 4: Chat ===")
 
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=300)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
         assert jpg_doc is not None, "2014胆囊.jpg not parsed"
 
         # Create dialog

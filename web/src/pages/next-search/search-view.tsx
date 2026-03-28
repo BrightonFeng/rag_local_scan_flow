@@ -2,7 +2,7 @@ import { EmptyType } from '@/components/empty/constant';
 import Empty from '@/components/empty/empty';
 import HighLightMarkdown from '@/components/highlight-markdown';
 import { FileIcon } from '@/components/icon-font';
-import { ImageWithPopover } from '@/components/image';
+import Image, { ImageWithPopover } from '@/components/image';
 import { Input } from '@/components/originui/input';
 import { SkeletonCard } from '@/components/skeleton-card';
 import { Button } from '@/components/ui/button';
@@ -262,7 +262,7 @@ export default function SearchingView({
                             </Popover>
                           </div>
                           <div
-                            className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit mt-3"
+                            className="flex gap-2 items-center text-xs text-text-secondary border p-1 rounded-lg w-fit mt-3 cursor-pointer"
                             onClick={() => {
                               if (
                                 chunk.source_type === 'local_scan' &&
