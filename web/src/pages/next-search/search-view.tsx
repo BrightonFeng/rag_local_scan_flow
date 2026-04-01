@@ -99,11 +99,11 @@ export default function SearchingView({
             setIsSearching?.(false);
           }}
         >
-          RAGFlow
+          &nbsp;
         </h1>
         <div
           className={cn(
-            ' rounded-lg text-primary text-xl sticky flex flex-col justify-center w-2/3 max-w-[780px] transform scale-100 ml-16 ',
+            ' rounded-lg text-primary text-xl sticky flex flex-col justify-center w-full max-w-none transform scale-100 ml-16 ',
           )}
         >
           <div className={cn('flex flex-col justify-start items-start w-full')}>

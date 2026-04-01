@@ -29,7 +29,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useSearchParams } from 'react-router';
 import { ISearchAppDetailProps } from '../next-searches/hooks';
 import { useClickDrawer } from './document-preview-modal/hooks';
 
@@ -43,14 +42,17 @@ export interface ISearchingProps {
 export type ISearchReturnProps = ReturnType<typeof useSearching>;
 
 export const useGetSharedSearchParams = () => {
-  const [searchParams] = useSearchParams();
+  // Use window.location instead of useSearchParams to avoid Android issues
+  const searchParams = new URLSearchParams(window.location.search);
+
   const data_prefix = 'data_';
-  const data = Object.fromEntries(
-    searchParams
-      .entries()
-      .filter(([key]) => key.startsWith(data_prefix))
-      .map(([key, value]) => [key.replace(data_prefix, ''), value]),
-  );
+  const data: Record<string, string> = {};
+  for (const [key, value] of searchParams.entries()) {
+    if (key.startsWith(data_prefix)) {
+      data[key.replace(data_prefix, '')] = value;
+    }
+  }
+
   return {
     from: searchParams.get('from') as SharedFrom,
     sharedId: searchParams.get('shared_id'),
@@ -64,7 +66,8 @@ export const useGetSharedSearchParams = () => {
 };
 
 export const useSearchFetchMindMap = () => {
-  const [searchParams] = useSearchParams();
+  // Use window.location instead of useSearchParams
+  const searchParams = new URLSearchParams(window.location.search);
   const sharedId = searchParams.get('shared_id');
   const fetchMindMapFunc = sharedId
     ? searchService.mindmapShare
@@ -135,7 +138,8 @@ export const useTestChunkRetrieval = (
 } => {
   const knowledgeBaseId = useKnowledgeBaseId();
   const { page, size: pageSize } = useSetPaginationParams();
-  const [searchParams] = useSearchParams();
+  // Use window.location instead of useSearchParams
+  const searchParams = new URLSearchParams(window.location.search);
   const shared_id = searchParams.get('shared_id');
   const retrievalTestFunc = shared_id
     ? kbService.retrievalTestShare
@@ -186,7 +190,8 @@ export const useTestChunkAllRetrieval = (
 } => {
   const knowledgeBaseId = useKnowledgeBaseId();
   const { page, size: pageSize } = useSetPaginationParams();
-  const [searchParams] = useSearchParams();
+  // Use window.location instead of useSearchParams
+  const searchParams = new URLSearchParams(window.location.search);
   const shared_id = searchParams.get('shared_id');
   const retrievalTestFunc = shared_id
     ? kbService.retrievalTestShare
@@ -276,7 +281,8 @@ export const useFetchRelatedQuestions = (
   tenantId?: string,
   searchId?: string,
 ) => {
-  const [searchParams] = useSearchParams();
+  // Use window.location instead of useSearchParams
+  const searchParams = new URLSearchParams(window.location.search);
   const shared_id = searchParams.get('shared_id');
   const retrievalTestFunc = shared_id
     ? searchService.getRelatedQuestionsShare
@@ -327,15 +333,27 @@ export const useSendQuestion = (
 
   const sendQuestion = useCallback(
     (question: string, enableAI: boolean = true) => {
+      console.log(
+        '[sendQuestion] called with:',
+        question,
+        'enableAI:',
+        enableAI,
+      );
       const q = trim(question);
-      if (isEmpty(q)) return;
+      if (isEmpty(q)) {
+        console.log('[sendQuestion] empty question, returning');
+        return;
+      }
+      console.log('[sendQuestion] setting pagination and states');
       setPagination({ page: 1 });
       setIsFirstRender(false);
       setCurrentAnswer({} as IAnswer);
       if (enableAI) {
+        console.log('[sendQuestion] calling send()');
         setSendingLoading(true);
         send({ kb_ids: kbIds, question: q, tenantId, search_id: searchId });
       }
+      console.log('[sendQuestion] calling testChunk');
       testChunk({
         kb_id: kbIds,
         highlight: true,
@@ -346,8 +364,10 @@ export const useSendQuestion = (
       });
 
       if (related_search) {
+        console.log('[sendQuestion] fetching related questions');
         fetchRelatedQuestions(q);
       }
+      console.log('[sendQuestion] completed');
     },
     [
       send,
@@ -451,6 +471,7 @@ export const useSearching = ({
   setSearchText,
 }: ISearchingProps) => {
   const { tenantId } = useGetSharedSearchParams();
+
   const {
     sendQuestion,
     handleClickRelatedQuestion,
@@ -546,7 +567,6 @@ export const useSearching = ({
     isSearchStrEmpty,
     setSearchStr,
     stopOutputMessage,
-
     visible,
     hideModal,
     documentId,
