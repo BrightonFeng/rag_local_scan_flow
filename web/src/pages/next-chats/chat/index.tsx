@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useMount } from 'ahooks';
 import { isEmpty } from 'lodash';
 import { LucideArrowBigLeft, LucideArrowUpRight } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHandleClickConversationCard } from '../hooks/use-click-card';
 import { ChatSettings } from './app-settings/chat-settings';
@@ -69,6 +69,16 @@ export default function Chat() {
   useMount(() => {
     fetchConversation(conversationId, isNew === 'true');
   });
+
+  useEffect(() => {
+    if (!conversationId && dialogList.length > 0) {
+      const sortedByUpdateTime = [...dialogList].sort(
+        (a, b) => (b.update_time || 0) - (a.update_time || 0),
+      );
+      const mostRecent = sortedByUpdateTime[0];
+      handleSessionClick(mostRecent.id, false);
+    }
+  }, [conversationId, dialogList, handleSessionClick]);
 
   if (isDebugMode) {
     return (

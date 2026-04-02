@@ -1,6 +1,7 @@
 import { ConfirmDeleteDialog } from '@/components/confirm-delete-dialog';
 import EmbedDialog from '@/components/embed-dialog';
 import { useShowEmbedModal } from '@/components/embed-dialog/use-show-embed-dialog';
+import { useIsMobile } from '@/components/hooks/use-mobile';
 import { MoreButton } from '@/components/more-button';
 import { RAGFlowAvatar } from '@/components/ragflow-avatar';
 import { Button } from '@/components/ui/button';
@@ -49,10 +50,11 @@ export function Sessions({ handleConversationCardClick }: SessionProps) {
     searchString,
   } = useSelectDerivedConversationList();
   const { data } = useFetchDialog();
-  const { visible, switchVisible } = useSetModalState(true);
   const { removeConversation } = useRemoveConversation();
   const { setConversationBoth } = useChatUrlParams();
   const { conversationId } = useGetChatSearchParams();
+  const isMobile = useIsMobile();
+  const { visible, switchVisible } = useSetModalState(isMobile);
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false);

@@ -1,20 +1,17 @@
 import { useFetchTokenListBeforeOtherStep } from '@/components/embed-dialog/use-show-embed-dialog';
 
 import { Button } from '@/components/ui/button';
-import { SharedFrom } from '@/constants/chat';
 import {
   useFetchTenantInfo,
   useFetchUserInfo,
 } from '@/hooks/use-user-setting-request';
-import { Routes } from '@/routes';
-import { Send, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ISearchAppDetailProps,
   useFetchSearchDetail,
 } from '../next-searches/hooks';
-import EmbedAppModal from './embed-app-modal';
 import { useCheckSettings } from './hooks';
 import './index.less';
 import SearchHome from './search-home';
@@ -82,27 +79,18 @@ export default function SearchPage() {
           />
         )}
         {
-          <EmbedAppModal
-            open={openEmbed}
-            setOpen={setOpenEmbed}
-            url={Routes.SearchShare}
-            token={SearchData?.id as string}
-            from={SharedFrom.Search}
-            tenantId={tenantId}
-            beta={beta}
-          />
-        }
-        {
-          // <EmbedDialog
-          //   visible={openEmbed}
-          //   hideModal={setOpenEmbed}
+          // <EmbedAppModal
+          //   open={openEmbed}
+          //   setOpen={setOpenEmbed}
+          //   url={Routes.SearchShare}
           //   token={SearchData?.id as string}
           //   from={SharedFrom.Search}
+          //   tenantId={tenantId}
           //   beta={beta}
-          //   isAgent={false}
-          // ></EmbedDialog>
+          // />
         }
       </div>
+      {/* </div>
       <div className="absolute end-5 top-4">
         <Button
           onClick={() => {
@@ -117,7 +105,7 @@ export default function SearchPage() {
           <Send />
           <div>{t('search.embedApp')}</div>
         </Button>
-      </div>
+      </div> */}
       {!isSearching && (
         <div className="absolute start-5 bottom-12 ">
           <Button
