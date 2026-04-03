@@ -64,18 +64,6 @@ class ScannedDirectoryService(CommonService):
         cls.model.delete().where(cls.model.id == pid).execute()
 
     @classmethod
-    @DB.connection_context()
-    def get_documents_by_directory(cls, directory_path, kb_id):
-        from api.db.db_models import Document
-        from api.db.db_models import File2Document
-
-        doc_ids = list(Document.select(Document.id).where(Document.source_type == FileSource.LOCAL_SCAN.value, Document.location.startswith(directory_path), Document.kb_id == kb_id))
-
-        file_ids = list(File2Document.select(File2Document.file_id).where(File2Document.document_id.in_([d.id for d in doc_ids])))
-
-        return file_ids
-
-    @classmethod
     def scan_directory(cls, kb_id, path, scan_interval=60, created_by=None, tenant_id=None):
         """
         Core scanning logic for local directory scan.
@@ -195,13 +183,13 @@ class ScannedDirectoryService(CommonService):
                         logging.info(f"Skipped (unchanged): {existing_doc.name}, size: {file_stat.st_size}")
                         continue
                     else:
-                        reparsed_count += 1
                         logging.info(f"Re-parsing (modified): {existing_doc.name}, old size: {existing_doc.size}, new size: {file_stat.st_size}")
                         try:
                             File2DocumentService.delete_by_document_id(existing_doc.id)
                             File.delete_by_id(existing_doc.id)
                             tenant_id_for_reparse = DocumentService.get_tenant_id(existing_doc.id)
                             DocumentService.remove_document(existing_doc, tenant_id_for_reparse)
+                            reparsed_count += 1
                         except Exception as e:
                             logging.warning(f"Failed to delete document {existing_doc.id} for re-parsing: {e}")
                 except OSError:
@@ -267,8 +255,8 @@ class ScannedDirectoryService(CommonService):
 
                 try:
                     File2Document.insert(id=doc_id, document_id=doc_id, file_id=doc_id).execute()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.warning(f"Failed to create File2Document for {rel_path}: {e}")
 
                 doc["tenant_id"] = kb.tenant_id
                 DocumentService.run(kb.tenant_id, doc, {})
