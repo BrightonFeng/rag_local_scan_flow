@@ -176,15 +176,18 @@ class ScannedDirectoryService(CommonService):
                 deleted_count += 1
                 logging.info(f"Deleted document (file removed): {existing_doc.name}, location: {doc_location}")
             else:
-                # File exists, check if modified
+                # File exists, check if modified (size or mtime changed)
+                # Use content_hash field to store mtime for LOCAL_SCAN documents
                 try:
                     file_stat = os.stat(doc_location)
-                    if existing_doc.size == file_stat.st_size:
+                    current_mtime = str(int(file_stat.st_mtime))
+                    if existing_doc.size == file_stat.st_size and existing_doc.content_hash == current_mtime:
                         skipped_count += 1
-                        logging.info(f"Skipped (unchanged): {existing_doc.name}, size: {file_stat.st_size}")
+                        logging.info(f"Skipped (unchanged): {existing_doc.name}, size: {file_stat.st_size}, mtime: {current_mtime}")
                         continue
                     else:
-                        logging.info(f"Re-parsing (modified): {existing_doc.name}, old size: {existing_doc.size}, new size: {file_stat.st_size}")
+                        old_mtime = existing_doc.content_hash or "N/A"
+                        logging.info(f"Re-parsing (modified): {existing_doc.name}, old size: {existing_doc.size}, new size: {file_stat.st_size}, old mtime: {old_mtime}, new mtime: {current_mtime}")
                         try:
                             File2DocumentService.delete_by_document_id(existing_doc.id)
                             File.delete_by_id(existing_doc.id)
@@ -231,7 +234,7 @@ class ScannedDirectoryService(CommonService):
                     "location": file_path,
                     "size": os.path.getsize(file_path),
                     "thumbnail": "",
-                    "content_hash": "",
+                    "content_hash": str(int(os.path.getmtime(file_path))),
                     "run": "1",
                     "status": "1",
                     "progress": 0,
