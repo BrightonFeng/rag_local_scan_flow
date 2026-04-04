@@ -96,6 +96,71 @@ class ScannedDirectoryService(CommonService):
             return False, None, f"Knowledgebase not found: {kb_id}"
 
         path = os.path.abspath(path)
+
+        def get_mounted_volumes():
+            mounted = set()
+            system_fs = {
+                "proc",
+                "sysfs",
+                "devtmpfs",
+                "devpts",
+                "tmpfs",
+                "squashfs",
+                "cgroup2",
+                "securityfs",
+                "pstore",
+                "efivarfs",
+                "bpf",
+                "autofs",
+                "mqueue",
+                "hugetlbfs",
+                "debugfs",
+                "tracefs",
+                "fusectl",
+                "configfs",
+                "overlay",
+                "aufs",
+                "unionfs",
+                "zfs",
+                "btrfs",
+                "ext4",
+                "f2fs",
+            }
+            skip_prefixes = (
+                "/snap/",
+                "/run/snapd",
+                "/run/user",
+                "/run/docker",
+                "/sys/fs",
+                "/boot/efi",
+                "/proc",
+                "/dev",
+            )
+            try:
+                with open("/proc/self/mountinfo", "r") as f:
+                    for line in f:
+                        parts = line.split(" - ")
+                        if len(parts) >= 2:
+                            mount_part = parts[0].split()
+                            fs_part = parts[1].split()
+                            if len(mount_part) >= 5 and len(fs_part) >= 2:
+                                mount_point = mount_part[4]
+                                fs_type = fs_part[1]
+                                if mount_point.startswith("/") and mount_point != "/" and fs_type.lower() not in system_fs:
+                                    if not any(mount_point.startswith(p) for p in skip_prefixes):
+                                        mounted.add(mount_point)
+            except Exception:
+                pass
+            return mounted
+
+        allowed_paths = sorted(get_mounted_volumes(), key=len, reverse=True)
+
+        if not allowed_paths:
+            return False, None, "No mounted volumes detected."
+
+        if not any(path.startswith(allowed) for allowed in allowed_paths):
+            return False, None, f"Path not allowed. Must be within mounted volumes: {allowed_paths}"
+
         if not os.path.exists(path):
             return False, None, f"Path does not exist: {path}"
         if not os.path.isdir(path):
