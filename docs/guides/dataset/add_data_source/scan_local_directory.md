@@ -40,7 +40,8 @@ Navigate to your knowledge base and click **Scan Local Directory** button.
   - Every 1 hour
   - Every 3 hours
   - Every day
-  - Every week (default)
+  - Every week
+  - Every 4 weeks (default)
 
 ### 3. Supported File Types
 
@@ -53,7 +54,13 @@ The feature supports a wide range of file types:
 - **Images**: JPG, JPEG, PNG, GIF, TIFF, SVG, etc. (with OCR support)
 - **Audio**: MP3, WAV, FLAC, AAC, OGG, etc. (with transcription support)
 
-### 4. Managing Scanned Directories
+### 4. File Size and Count Limits
+
+- **File size limit**: 512MB per file (for visual models like OCR/VLM)
+- **File count limit**: 10,000 files per directory
+  - If a directory exceeds this limit, split it into multiple subdirectories and add them separately
+
+### 5. Managing Scanned Directories
 
 After first scanning, you can:
 
@@ -67,11 +74,11 @@ The scanner automatically handles file changes in the scanned directory:
 
 1. **New files**: If a new file is added to the directory, it will be added to the database and parsing will be triggered automatically.
 
-2. **Modified files**: If a scanned file is modified (detected by file size change), the existing record will be updated and re-parsing will be triggered.
+2. **Modified files**: If a scanned file is modified (detected by file size or modification time change), the existing record will be updated and re-parsing will be triggered.
 
 3. **Deleted files**: If a file is deleted from the local directory, the corresponding record in the database will be automatically removed.
 
-4. **Unchanged files**: Files that have not been modified will be skipped to save processing time.
+4. **Unchanged files**: Files that have not been modified (same size and mtime) will be skipped to save processing time.
 
 ## Viewing Scanned Files
 
@@ -81,3 +88,13 @@ Clicking on a reference document in chat will open the file in a new browser win
 
 - The user running the RAGFlow container must have read permissions to the scanned directories
 - Automatic scanning runs in the background at the configured interval
+
+## Security Restrictions
+
+For security reasons, scanned directories must be **Docker-mounted volumes**. The system automatically detects mounted volumes from `/proc/self/mountinfo` and only allows scanning paths within these directories.
+
+**Allowed mount points** (automatically detected):
+- Volumes mounted to the RAGFlow container (e.g., `/hdd1`, `/hdd2`, `/data`)
+- System directories like `/proc`, `/dev`, `/sys` are excluded
+
+If you try to scan a directory outside the mounted volumes, you will receive an error message indicating which volumes are allowed.
