@@ -924,7 +924,7 @@ class DocumentService(CommonService):
         return {"processing": int(row["processing"]), "finished": int(row["finished"]), "failed": int(row["failed"]), "cancelled": int(cancelled), "downloaded": int(downloaded)}
 
     @classmethod
-    def run(cls, tenant_id: str, doc: dict, kb_table_num_map: dict):
+    def run(cls, tenant_id: str, doc: dict, kb_table_num_map: dict, priority: int = 0):
         from api.db.services.task_service import queue_dataflow, queue_tasks
         from api.db.services.file2document_service import File2DocumentService
 
@@ -943,7 +943,7 @@ class DocumentService(CommonService):
             queue_dataflow(tenant_id, flow_id=doc["pipeline_id"], task_id=get_uuid(), doc_id=doc["id"])
         else:
             bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
-            queue_tasks(doc, bucket, name, 0)
+            queue_tasks(doc, bucket, name, priority)
 
 
 def queue_raptor_o_graphrag_tasks(sample_doc_id, ty, priority, fake_doc_id="", doc_ids=[]):

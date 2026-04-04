@@ -64,7 +64,7 @@ class ScannedDirectoryService(CommonService):
         cls.model.delete().where(cls.model.id == pid).execute()
 
     @classmethod
-    def scan_directory(cls, kb_id, path, scan_interval=60, created_by=None, tenant_id=None):
+    def scan_directory(cls, kb_id, path, scan_interval=60, created_by=None, tenant_id=None, priority=0):
         """
         Core scanning logic for local directory scan.
 
@@ -74,6 +74,7 @@ class ScannedDirectoryService(CommonService):
             scan_interval: Scan interval in minutes
             created_by: User ID who initiated the scan (for API calls)
             tenant_id: Tenant ID (alternative to created_by for background scans)
+            priority: Task priority (0=normal, 1=high)
 
         Returns:
             tuple: (success: bool, data: dict or scan_dir_id, error_message: str or None)
@@ -259,7 +260,7 @@ class ScannedDirectoryService(CommonService):
                     logging.warning(f"Failed to create File2Document for {rel_path}: {e}")
 
                 doc["tenant_id"] = kb.tenant_id
-                DocumentService.run(kb.tenant_id, doc, {})
+                DocumentService.run(kb.tenant_id, doc, {}, priority=priority)
                 imported_docs.append(doc_id)
             except Exception as e:
                 logging.error(f"Failed to process file {rel_path}: {str(e)}")

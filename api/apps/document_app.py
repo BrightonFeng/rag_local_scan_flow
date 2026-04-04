@@ -1003,6 +1003,7 @@ async def scan_path():
     kb_id = req.get("kb_id")
     path = req.get("path")
     scan_interval = req.get("scan_interval", 60)
+    priority = req.get("priority", 0)
 
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
@@ -1023,7 +1024,7 @@ async def scan_path():
 
     from api.db.services.scanned_directory_service import ScannedDirectoryService
 
-    success, data, error = ScannedDirectoryService.scan_directory(kb_id, path, scan_interval, created_by=current_user.id)
+    success, data, error = ScannedDirectoryService.scan_directory(kb_id, path, scan_interval, created_by=current_user.id, priority=priority)
 
     if not success:
         return get_json_result(data=False, message=error, code=RetCode.ARGUMENT_ERROR)

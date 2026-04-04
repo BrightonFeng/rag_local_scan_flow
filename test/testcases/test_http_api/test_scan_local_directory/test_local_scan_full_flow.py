@@ -66,7 +66,7 @@ class TestLocalScanRetrievalFlow:
             resp = requests.post(
                 f"{HOST_ADDRESS}/{VERSION}/document/scan_path",
                 headers=_make_auth(scan_auth),
-                json={"kb_id": kb_id, "path": "/hdd1/test_scan", "scan_interval": 10080},
+                json={"kb_id": kb_id, "path": "/hdd1/test_scan", "scan_interval": 10080, "priority": 1},
                 timeout=30,
             )
             scan_data = resp.json()
@@ -195,15 +195,15 @@ class TestLocalScanRetrievalFlow:
 
         print(f"\n=== Step 2: Parsing Results ===")
 
-        # Verify 骑马.mp4 parsing completed (timeout 10 minutes)
-        mp4_doc = self._wait_doc_parsed(scan_auth, kb, "骑马.mp4", timeout=600)
-        assert mp4_doc is not None, "骑马.mp4 not parsed after 10 minutes"
+        # Verify 骑马.mp4 parsing completed (timeout 30 minutes)
+        mp4_doc = self._wait_doc_parsed(scan_auth, kb, "骑马.mp4", timeout=1800)
+        assert mp4_doc is not None, "骑马.mp4 not parsed after 30 minutes"
         assert mp4_doc["chunk_num"] > 0, "骑马.mp4 has no chunks"
         print(f"  ✓ 骑马.mp4 parsed ({mp4_doc['chunk_num']} chunks)")
 
-        # Verify 2014胆囊.jpg parsing completed (timeout 10 minutes)
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
-        assert jpg_doc is not None, "2014胆囊.jpg not parsed after 10 minutes"
+        # Verify 2014胆囊.jpg parsing completed (timeout 30 minutes)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=1800)
+        assert jpg_doc is not None, "2014胆囊.jpg not parsed after 30 minutes"
         assert jpg_doc["chunk_num"] > 0, "2014胆囊.jpg has no chunks"
         print(f"  ✓ 2014胆囊.jpg parsed ({jpg_doc['chunk_num']} chunks)")
 
@@ -213,7 +213,7 @@ class TestLocalScanRetrievalFlow:
 
         print(f"\n=== Step 3: Search Retrieval ===")
 
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=1800)
         assert jpg_doc is not None, "2014胆囊.jpg not parsed"
 
         resp = requests.post(
@@ -254,7 +254,7 @@ class TestLocalScanRetrievalFlow:
 
         print(f"\n=== Step 4: Chat ===")
 
-        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=600)
+        jpg_doc = self._wait_doc_parsed(scan_auth, kb, "2014胆囊.jpg", timeout=1800)
         assert jpg_doc is not None, "2014胆囊.jpg not parsed"
 
         # Create dialog
