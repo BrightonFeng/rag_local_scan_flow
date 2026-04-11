@@ -2761,7 +2761,7 @@ Important structured information may include: names, dates, locations, events, k
       note: "Note: This feature scans files from the server's local filesystem.",
       pathPlaceholder: '/path/to/directory',
       scan: 'Scan',
-      cancel: 'Cancel',
+      cancel: 'Close',
       delete: 'Delete',
       noDirectoriesScanned: 'No directories scanned yet',
       every10Minutes: 'Every 10 minutes',
@@ -2781,6 +2781,9 @@ Important structured information may include: names, dates, locations, events, k
       confirmDelete:
         'Are you sure you want to remove this directory from the scan list?',
       confirmDeleteTitle: 'Confirm Delete',
+      duplicatePathTitle: 'Duplicate Path',
+      duplicatePathMessage:
+        'This path has already been added to the scan list. Please use a different path or remove it from the list first.',
     },
     sourceLocal: 'Local Upload',
     sourceLocalPath: 'Local Scan',

@@ -54,6 +54,25 @@ const ScanPathModal: React.FC<IProps> = ({
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
+
+      // Check if path already exists in previously scanned directories
+      const normalizePath = (p: string) =>
+        p.replace(/\\+/g, '/').replace(/\/+$/, '');
+      const inputPath = normalizePath(values.path);
+      const exists = directories.some(
+        (dir) => normalizePath(dir.directory_path) === inputPath,
+      );
+
+      if (exists) {
+        Modal.error({
+          title: t('scanDirectory.duplicatePathTitle') || 'Duplicate path',
+          content:
+            t('scanDirectory.duplicatePathMessage') ||
+            'This path has already been scanned.',
+        });
+        return;
+      }
+
       onOk(values.path, values.scan_interval);
       form.resetFields();
     } catch (error) {
