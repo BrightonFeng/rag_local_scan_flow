@@ -85,6 +85,27 @@ Try our demo at [https://demo.ragflow.io](https://demo.ragflow.io).
 <img src="https://raw.githubusercontent.com/infiniflow/ragflow-docs/refs/heads/image/image/agentic-dark.gif" width="1200"/>
 </div>
 
+## What is new with the rag_local_scan_flow fork
+
+This fork supports scanning directories on the server's local filesystem and importing files into your knowledge base. Unlike traditional file upload, this feature does NOT store the original files in MinIO storage - it only stores the file paths and creates embedding vectors for retrieval.
+
+### When to Use This Feature
+
+- **Large files**: When you have large files that you don't want to duplicate in MinIO storage
+- **Shared directories**: When multiple knowledge bases need to access the same files
+- **Server access**: When the RAGFlow server has direct access to the files (e.g., network drives, local disks)
+- **Dynamic content**: When files are updated frequently and you want automatic synchronization
+
+### Differences from Original Upload
+
+| Feature | Traditional Upload | Local Directory Scan |
+|---------|------------------|---------------------|
+| Storage | Files stored in MinIO | Only file paths and index vector stored |
+| File access | Through MinIO database | Direct filesystem access |
+| Auto-sync | Manual re-upload | Configurable automatic scan |
+| Storage cost | Uses MinIO storage | No additional storage |
+
+
 ## 🔥 Latest Updates
 
 - 2025-12-26 Supports 'Memory' for AI agent.
